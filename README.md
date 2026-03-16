@@ -1,67 +1,76 @@
-# Payload Blank Template
+# Sistema Gimnasio Payload
 
-This template comes configured with the bare minimum to get started on anything you need.
+Proyecto backend-first para migrar la logica de datos del sistema de gimnasio a Next.js + Payload + TypeScript.
 
-## Quick start
+## Estado actual
 
-This template can be deployed directly from our Cloud hosting and it will setup MongoDB and cloud S3 object storage for media.
+Implementado en esta fase:
 
-## Quick Start - local setup
+- Colecciones: users, media, clientes, pagos, configuraciones, logs.
+- Auth Payload con roles `admin` y `staff`.
+- Dashboard funcional con modulos:
+  - Clientes: create/read/update/delete + busqueda + detalle con historial de pagos.
+  - Pagos: create/read/update/delete + filtros por mes/anio.
+  - Horario: tabla por turnos usando pagos activos del mes.
+  - Ajustes: precios y carga de logo.
+  - Logs: tabla con filtros por entidad y accion.
+- Hooks de negocio:
+  - Crear cliente genera pago inicial automatico del mes actual.
+  - Editar cliente no modifica pagos existentes.
+  - Eliminar cliente conserva pagos historicos (desasocia `pago.cliente`).
+  - Logs minimos para CRUD de cliente y pago.
+- Regla anti-duplicado de pagos por `cliente + mesPago + anioPago`.
+- Endpoints de configuracion:
+  - `GET /api/configuraciones/precios`
+  - `POST /api/configuraciones/upsert`
+  - `GET /api/configuraciones/logo`
+  - `POST /api/configuraciones/logo`
 
-To spin up this template locally, follow these steps:
+## Requisitos
 
-### Clone
+- Node 20+
+- pnpm 10+
 
-After you click the `Deploy` button above, you'll want to have standalone copy of this repo on your machine. If you've already cloned this repo, skip to [Development](#development).
+## Inicio rapido (internet limitado)
 
-### Development
+1. Copiar variables:
+   - `cp .env.example .env`
+2. Instalar:
+   - `pnpm install`
+3. Generar tipos:
+   - `pnpm generate:types`
+4. Levantar app:
+   - `pnpm dev`
 
-1. First [clone the repo](#clone) if you have not done so already
-2. `cd my-project && cp .env.example .env` to copy the example environment variables. You'll need to add the `MONGODB_URL` from your Cloud project to your `.env` if you want to use S3 storage and the MongoDB database that was created for you.
+## Configuracion de DB
 
-3. `pnpm install && pnpm dev` to install dependencies and start the dev server
-4. open `http://localhost:3000` to open the app in your browser
+- Por defecto usa SQLite local con `DATABASE_URL=file:./sistema-gimnasio-payload.db`.
+- Si defines `POSTGRES_URL`, se activa automaticamente el adapter Postgres.
 
-That's it! Changes made in `./src` will be reflected in your app. Follow the on-screen instructions to login and create your first admin user. Then check out [Production](#production) once you're ready to build and serve your app, and [Deployment](#deployment) when you're ready to go live.
+## Configuracion de Blob
 
-#### Docker (Optional)
+- Si defines `BLOB_READ_WRITE_TOKEN`, se activa storage en Vercel Blob para `media`.
+- Si no lo defines, Payload mantiene upload local.
 
-If you prefer to use Docker for local development instead of a local MongoDB instance, the provided docker-compose.yml file can be used.
+## Reglas de negocio de pagos al crear cliente
 
-To do so, follow these steps:
+Prioridad de servicio y monto:
 
-- Modify the `MONGODB_URL` in your `.env` file to `mongodb://127.0.0.1/<dbname>`
-- Modify the `docker-compose.yml` file's `MONGODB_URL` to match the above `<dbname>`
-- Run `docker-compose up` to start the database, optionally pass `-d` to run in the background.
+1. `vip && zumba && box` -> `VIP + Zumba y Box` -> `precio_vip_zumba_y_box`
+2. `vip` -> `VIP` -> `precio_vip`
+3. `zumba && box` -> `Zumba y Box` -> `precio_zumba_y_box`
+4. `zumba || box` -> `Zumba` o `Box` -> `precio_zumba_o_box`
+5. default -> `Normal` -> `precio_normal`
 
-## How it works
+Defaults de precios si faltan configuraciones:
 
-The Payload config is tailored specifically to the needs of most websites. It is pre-configured in the following ways:
+- precio_normal: 30
+- precio_vip: 50
+- precio_zumba_o_box: 40
+- precio_zumba_y_box: 60
+- precio_vip_zumba_y_box: 80
 
-### Collections
+## Proximo bloque
 
-See the [Collections](https://payloadcms.com/docs/configuration/collections) docs for details on how to extend this functionality.
-
-- #### Users (Authentication)
-
-  Users are auth-enabled collections that have access to the admin panel.
-
-  For additional help, see the official [Auth Example](https://github.com/payloadcms/payload/tree/main/examples/auth) or the [Authentication](https://payloadcms.com/docs/authentication/overview#authentication-overview) docs.
-
-- #### Media
-
-  This is the uploads enabled collection. It features pre-configured sizes, focal point and manual resizing to help you manage your pictures.
-
-### Docker
-
-Alternatively, you can use [Docker](https://www.docker.com) to spin up this template locally. To do so, follow these steps:
-
-1. Follow [steps 1 and 2 from above](#development), the docker-compose file will automatically use the `.env` file in your project root
-1. Next run `docker-compose up`
-1. Follow [steps 4 and 5 from above](#development) to login and create your first admin user
-
-That's it! The Docker instance will help you get up and running quickly while also standardizing the development environment across your teams.
-
-## Questions
-
-If you have any issues or questions, reach out to us on [Discord](https://discord.com/invite/payload) or start a [GitHub discussion](https://github.com/payloadcms/payload/discussions).
+- Agregar paginacion y filtros avanzados (VIP, servicio, rango de fechas).
+- Endurecer permisos por rol en acciones sensibles del frontend.

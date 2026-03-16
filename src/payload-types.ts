@@ -69,6 +69,10 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    clientes: Cliente;
+    pagos: Pago;
+    configuraciones: Configuracione;
+    logs: Log;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,18 +82,25 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    clientes: ClientesSelect<false> | ClientesSelect<true>;
+    pagos: PagosSelect<false> | PagosSelect<true>;
+    configuraciones: ConfiguracionesSelect<false> | ConfiguracionesSelect<true>;
+    logs: LogsSelect<false> | LogsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
   fallbackLocale: null;
   globals: {};
   globalsSelect: {};
   locale: null;
+  widgets: {
+    collections: CollectionsWidget;
+  };
   user: User;
   jobs: {
     tasks: unknown;
@@ -119,7 +130,9 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
+  role: 'admin' | 'staff';
+  active?: boolean | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -144,8 +157,8 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
-  alt: string;
+  id: number;
+  alt?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -160,10 +173,110 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "clientes".
+ */
+export interface Cliente {
+  id: number;
+  name: string;
+  lastName: string;
+  phone: string;
+  email?: string | null;
+  vip?: boolean | null;
+  zumba?: boolean | null;
+  box?: boolean | null;
+  turno?:
+    | (
+        | 'de 7:00 am a 8:00 am'
+        | 'de 8:00 am a 9:00 am'
+        | 'de 9:00 am a 10:00 am'
+        | 'de 10:00 am a 11:00 am'
+        | 'de 11:00 am a 12:00 pm'
+        | 'de 1:00 pm a 2:00 pm'
+        | 'de 2:00 pm a 3:00 pm'
+        | 'de 3:00 pm a 4:00 pm'
+        | 'de 4:00 pm a 5:00 pm'
+        | 'de 5:00 pm a 6:00 pm'
+        | 'de 6:00 pm a 7:00 pm'
+        | 'de 7:00 pm a 8:00 pm'
+      )
+    | null;
+  metodoPago?: ('Efectivo' | 'Tarjeta') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pagos".
+ */
+export interface Pago {
+  id: number;
+  monto: number;
+  metodoPago?: ('Efectivo' | 'Tarjeta') | null;
+  tipoServicio: 'Normal' | 'VIP' | 'Zumba' | 'Box' | 'Zumba y Box' | 'VIP + Zumba y Box';
+  fechaPago: string;
+  mesPago: number;
+  anioPago: number;
+  turno?:
+    | (
+        | 'de 7:00 am a 8:00 am'
+        | 'de 8:00 am a 9:00 am'
+        | 'de 9:00 am a 10:00 am'
+        | 'de 10:00 am a 11:00 am'
+        | 'de 11:00 am a 12:00 pm'
+        | 'de 1:00 pm a 2:00 pm'
+        | 'de 2:00 pm a 3:00 pm'
+        | 'de 3:00 pm a 4:00 pm'
+        | 'de 4:00 pm a 5:00 pm'
+        | 'de 5:00 pm a 6:00 pm'
+        | 'de 6:00 pm a 7:00 pm'
+        | 'de 7:00 pm a 8:00 pm'
+      )
+    | null;
+  cliente?: (number | null) | Cliente;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "configuraciones".
+ */
+export interface Configuracione {
+  id: number;
+  clave: string;
+  valor: string;
+  logo?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "logs".
+ */
+export interface Log {
+  id: number;
+  accion: 'crear_cliente' | 'editar_cliente' | 'eliminar_cliente' | 'crear_pago' | 'editar_pago' | 'eliminar_pago';
+  entidad: string;
+  entidadId?: string | null;
+  detalles?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  usuario?: string | null;
+  nombreCompleto?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
-  id: string;
+  id: number;
   key: string;
   data:
     | {
@@ -180,20 +293,36 @@ export interface PayloadKv {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'clientes';
+        value: number | Cliente;
+      } | null)
+    | ({
+        relationTo: 'pagos';
+        value: number | Pago;
+      } | null)
+    | ({
+        relationTo: 'configuraciones';
+        value: number | Configuracione;
+      } | null)
+    | ({
+        relationTo: 'logs';
+        value: number | Log;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -203,10 +332,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -226,7 +355,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -237,6 +366,8 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  role?: T;
+  active?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -271,6 +402,64 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "clientes_select".
+ */
+export interface ClientesSelect<T extends boolean = true> {
+  name?: T;
+  lastName?: T;
+  phone?: T;
+  email?: T;
+  vip?: T;
+  zumba?: T;
+  box?: T;
+  turno?: T;
+  metodoPago?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pagos_select".
+ */
+export interface PagosSelect<T extends boolean = true> {
+  monto?: T;
+  metodoPago?: T;
+  tipoServicio?: T;
+  fechaPago?: T;
+  mesPago?: T;
+  anioPago?: T;
+  turno?: T;
+  cliente?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "configuraciones_select".
+ */
+export interface ConfiguracionesSelect<T extends boolean = true> {
+  clave?: T;
+  valor?: T;
+  logo?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "logs_select".
+ */
+export interface LogsSelect<T extends boolean = true> {
+  accion?: T;
+  entidad?: T;
+  entidadId?: T;
+  detalles?: T;
+  usuario?: T;
+  nombreCompleto?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -311,6 +500,16 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collections_widget".
+ */
+export interface CollectionsWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

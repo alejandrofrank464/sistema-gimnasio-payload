@@ -5,11 +5,14 @@ export const Media: CollectionConfig = {
   access: {
     read: () => true,
   },
+  admin: {
+    useAsTitle: 'alt',
+  },
   fields: [
     {
       name: 'alt',
       type: 'text',
-      required: true,
+      required: false,
     },
   ],
   upload: true,
