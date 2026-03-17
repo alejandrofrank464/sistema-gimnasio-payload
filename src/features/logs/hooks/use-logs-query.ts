@@ -53,6 +53,15 @@ type BackendPaginatedResponse = {
   page?: number
 }
 
+type LogsListParams = {
+  page: number
+  limit: number
+  search?: string
+  entity?: 'all' | 'Cliente' | 'Pago' | 'Ajuste'
+  action?: 'all' | 'Crear' | 'Editar' | 'Eliminar'
+  sortDate?: 'asc' | 'desc'
+}
+
 export const useLogsQuery = () => {
   return useQuery({
     queryKey: queryKeys.logs,
@@ -66,7 +75,7 @@ export const useLogsQuery = () => {
   })
 }
 
-export const useLogsListQuery = (params: { page: number; limit: number; search?: string }) => {
+export const useLogsListQuery = (params: LogsListParams) => {
   return useQuery({
     queryKey: queryKeys.logsList(params),
     queryFn: async (): Promise<PaginatedLogsResult> => {

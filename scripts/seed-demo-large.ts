@@ -20,6 +20,8 @@ import { getPayload } from 'payload'
 import { METODO_PAGO_OPTIONS, TURNO_OPTIONS, type TipoServicio } from '../src/constants/domain'
 import config from '../src/payload.config'
 
+type PayloadInstance = Awaited<ReturnType<typeof getPayload>>
+
 type RelationshipValue = number | string | { id?: number | string | null } | null | undefined
 
 const DEMO_DOMAIN = 'demo.gym.local'
@@ -256,6 +258,16 @@ async function seedClients(
   return upsertedClientIds
 }
 
+const closePayload = async (payloadInstance: PayloadInstance | null) => {
+  const db = payloadInstance?.db
+  if (!db) return
+
+  const destroy = 'destroy' in db ? db.destroy : null
+  if (typeof destroy === 'function') {
+    await destroy.call(db)
+  }
+}
+
 async function seedHistoricalPayments(
   payloadInstance: Awaited<ReturnType<typeof getPayload>>,
   clientIds: Array<number | string>,
@@ -422,60 +434,69 @@ async function resetDemoData(payloadInstance: Awaited<ReturnType<typeof getPaylo
 }
 
 async function main() {
-  const payloadInstance = await getPayload({ config })
-  const shouldReset = process.argv.includes('--reset')
-  const countArg = process.argv.find((arg) => arg.startsWith('--count='))
-  const clientCount = countArg ? parseInt(countArg.split('=')[1], 10) : 100
+  let payloadInstance: PayloadInstance | null = null
 
-  if (isNaN(clientCount) || clientCount < 1) {
-    console.error('❌ --count debe ser un número válido >= 1')
-    process.exit(1)
-  }
+  try {
+    payloadInstance = await getPayload({ config })
+    const shouldReset = process.argv.includes('--reset')
+    const countArg = process.argv.find((arg) => arg.startsWith('--count='))
+    const clientCount = countArg ? parseInt(countArg.split('=')[1], 10) : 100
 
-  if (shouldReset) {
-    await resetDemoData(payloadInstance)
-  }
+    if (isNaN(clientCount) || clientCount < 1) {
+      throw new Error('--count debe ser un número válido >= 1')
+    }
 
-  const clients = await generateClients(clientCount)
-  const clientIds = await seedClients(payloadInstance, clients)
-  await seedHistoricalPayments(payloadInstance, clientIds)
+    if (shouldReset) {
+      await resetDemoData(payloadInstance)
+    }
 
-  const current = new Date()
-  const pagosCurrentMonth = await payloadInstance.find({
-    collection: 'pagos',
-    where: {
-      and: [
-        { mesPago: { equals: current.getMonth() } },
-        { anioPago: { equals: current.getFullYear() } },
-      ],
-    },
-    depth: 0,
-    limit: 2000,
-  })
+    const clients = await generateClients(clientCount)
+    const clientIds = await seedClients(payloadInstance, clients)
+    await seedHistoricalPayments(payloadInstance, clientIds)
 
-  const allDemoClients = await payloadInstance.find({
-    collection: 'clientes',
-    where: {
-      email: {
-        like: `@${DEMO_DOMAIN}`,
+    const current = new Date()
+    const pagosCurrentMonth = await payloadInstance.find({
+      collection: 'pagos',
+      where: {
+        and: [
+          { mesPago: { equals: current.getMonth() } },
+          { anioPago: { equals: current.getFullYear() } },
+        ],
       },
-    },
-    depth: 0,
-    limit: 1000,
-  })
+      depth: 0,
+      limit: 2000,
+    })
 
-  console.log('\n✅ Seed demo completado')
-  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-  console.log(`📊 Estadísticas:`)
-  console.log(`  Total clientes demo en BD: ${allDemoClients.totalDocs}`)
-  console.log(`  Pagos del mes actual: ${pagosCurrentMonth.totalDocs}`)
-  console.log(`  Pagos históricos: ${clientIds.length * 2}`) // 2 meses previos por cliente
-  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
-  console.log(`🔐 Login admin: admin@${DEMO_DOMAIN} / admin123`)
-  console.log(`🔐 Login staff: staff@${DEMO_DOMAIN} / staff123`)
+    const allDemoClients = await payloadInstance.find({
+      collection: 'clientes',
+      where: {
+        email: {
+          like: `@${DEMO_DOMAIN}`,
+        },
+      },
+      depth: 0,
+      limit: 1000,
+    })
+
+    console.log('\n✅ Seed demo completado')
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    console.log(`📊 Estadísticas:`)
+    console.log(`  Total clientes demo en BD: ${allDemoClients.totalDocs}`)
+    console.log(`  Pagos del mes actual: ${pagosCurrentMonth.totalDocs}`)
+    console.log(`  Pagos históricos: ${clientIds.length * 2}`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    console.log(`🔐 Login admin: admin@${DEMO_DOMAIN} / admin123`)
+    console.log(`🔐 Login staff: staff@${DEMO_DOMAIN} / staff123`)
+  } finally {
+    await closePayload(payloadInstance)
+  }
 }
 
-main().catch((error) => {
-  console.error('❌ Error ejecutando seed demo large:', error)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('❌ Error ejecutando seed demo large:', error)
+    process.exit(1)
+  })

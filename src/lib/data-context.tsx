@@ -53,6 +53,8 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 const SETTINGS_CACHE_TTL_MS = 10 * 60 * 1000
+const SETTINGS_SESSION_KEY = 'gym_settings_cache'
+const SETTINGS_FETCHED_AT_KEY = 'gym_settings_fetched_at'
 
 const SETTINGS_KEY_MAP: Record<TipoServicio, keyof PriceMap> = {
   Normal: 'precio_normal',
@@ -66,6 +68,40 @@ const SETTINGS_KEY_MAP: Record<TipoServicio, keyof PriceMap> = {
 const getToken = (): string | null => {
   if (typeof window === 'undefined') return null
   return window.sessionStorage.getItem('gym_token')
+}
+
+const readCachedSettings = (): { settings: Settings; fetchedAt: number } | null => {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.sessionStorage.getItem(SETTINGS_SESSION_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as Settings
+    if (!parsed || typeof parsed !== 'object') return null
+    if (!Array.isArray(parsed.precios) || typeof parsed.nombreGimnasio !== 'string') return null
+
+    const fetchedRaw = window.sessionStorage.getItem(SETTINGS_FETCHED_AT_KEY)
+    const fetchedAt = fetchedRaw ? Number(fetchedRaw) : 0
+
+    return {
+      settings: parsed,
+      fetchedAt: Number.isFinite(fetchedAt) ? fetchedAt : 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+const writeCachedSettings = (settings: Settings, fetchedAt: number) => {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.sessionStorage.setItem(SETTINGS_SESSION_KEY, JSON.stringify(settings))
+    window.sessionStorage.setItem(SETTINGS_FETCHED_AT_KEY, String(fetchedAt))
+  } catch {
+    // Ignore quota/storage errors.
+  }
 }
 
 const settingsToPriceMap = (settings: Settings): PriceMap => {
@@ -118,9 +154,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
   const settingsFetchedAtRef = useRef<number>(0)
+  const hasHydratedCacheRef = useRef(false)
 
   useEffect(() => {
     settingsRef.current = settings
+  }, [settings])
+
+  useEffect(() => {
+    const cached = readCachedSettings()
+    if (cached) {
+      setSettings(cached.settings)
+      settingsRef.current = cached.settings
+      settingsFetchedAtRef.current = cached.fetchedAt
+    }
+
+    hasHydratedCacheRef.current = true
+  }, [])
+
+  useEffect(() => {
+    if (!hasHydratedCacheRef.current) return
+    writeCachedSettings(settings, settingsFetchedAtRef.current)
   }, [settings])
 
   const refreshSettings = useCallback(async (options?: { force?: boolean }) => {
@@ -128,6 +181,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!token) {
       setSettings(DEFAULT_SETTINGS)
       settingsFetchedAtRef.current = 0
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(SETTINGS_SESSION_KEY)
+        window.sessionStorage.removeItem(SETTINGS_FETCHED_AT_KEY)
+      }
       return
     }
 
@@ -140,11 +197,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const [preciosRes, logoRes] = await Promise.all([
+    const [nombreRes, preciosRes, logoRes] = await Promise.all([
+      apiClient.settings.name(),
       apiClient.settings.prices(),
       apiClient.settings.logo(),
     ])
 
+    const nombreJson = (await nombreRes.json()) as { data?: { nombreGimnasio?: string } | null }
     const preciosJson = (await preciosRes.json()) as { data?: Partial<PriceMap> }
     const logoJson = (await logoRes.json()) as { data?: { url?: string | null } | null }
 
@@ -153,8 +212,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...(preciosJson.data || {}),
     }
 
-    setSettings(priceMapToSettings(nextPriceMap, logoJson.data?.url || ''))
+    const nombreGimnasio =
+      nombreJson.data?.nombreGimnasio?.trim() || DEFAULT_SETTINGS.nombreGimnasio
+    setSettings({
+      ...priceMapToSettings(nextPriceMap, logoJson.data?.url || ''),
+      nombreGimnasio,
+    })
     settingsFetchedAtRef.current = Date.now()
+    writeCachedSettings(
+      {
+        ...priceMapToSettings(nextPriceMap, logoJson.data?.url || ''),
+        nombreGimnasio,
+      },
+      settingsFetchedAtRef.current,
+    )
   }, [])
 
   useEffect(() => {
@@ -212,6 +283,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setSettings((prev) => ({ ...prev, logoUrl: data.logoUrl || prev.logoUrl }))
       }
 
+      if (data.nombreGimnasio && data.nombreGimnasio.trim() !== '') {
+        setSettings((prev) => ({ ...prev, nombreGimnasio: data.nombreGimnasio!.trim() }))
+      }
+
       await refreshSettings({ force: true })
     },
     [refreshSettings],
@@ -226,5 +301,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [settings, loading, updateSettings],
   )
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>
+  const shouldGateDashboardRender = isDashboardRoute(pathname) && loading
+
+  return (
+    <DataContext.Provider value={value}>
+      {shouldGateDashboardRender ? (
+        <div className="text-muted-foreground flex min-h-[40vh] items-center justify-center text-sm">
+          Cargando configuración...
+        </div>
+      ) : (
+        children
+      )}
+    </DataContext.Provider>
+  )
 }

@@ -1,13 +1,11 @@
 'use client'
-
-import { useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useData } from '@/lib/data-context'
 import { MESES } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { StatusBadge, PaymentStatusBadge } from '@/components/shared/StatusBadge'
+import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ArrowLeft, Phone, Mail, Calendar, FileText } from 'lucide-react'
 import { useClientsQuery } from '@/features/clients/hooks/use-clients-query'
 import { useClientPaymentsInfiniteQuery } from '@/features/payments/hooks/use-payments-query'
@@ -25,6 +23,7 @@ export default function ClientDetailPage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useClientPaymentsInfiniteQuery(id, 25)
+  const paymentsByClient = paymentsPages?.pages.flatMap((page) => page.docs) ?? []
 
   const client = id ? clients.find((c) => c.id === id) : undefined
   if (!client) {
@@ -37,11 +36,6 @@ export default function ClientDetailPage() {
       </div>
     )
   }
-
-  const paymentsByClient = useMemo(
-    () => paymentsPages?.pages.flatMap((page) => page.docs) ?? [],
-    [paymentsPages],
-  )
 
   const now = new Date()
   const isActive = paymentsByClient.some(
@@ -134,7 +128,6 @@ export default function ClientDetailPage() {
                         <span className="text-success text-sm font-medium tabular-nums">
                           ${p.monto}
                         </span>
-                        <PaymentStatusBadge estado={p.estado} />
                       </div>
                     </div>
                   ))}

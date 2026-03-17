@@ -181,6 +181,7 @@ export interface Cliente {
   lastName: string;
   phone: string;
   email?: string | null;
+  notes?: string | null;
   vip?: boolean | null;
   zumba?: boolean | null;
   box?: boolean | null;
@@ -412,6 +413,7 @@ export interface ClientesSelect<T extends boolean = true> {
   lastName?: T;
   phone?: T;
   email?: T;
+  notes?: T;
   vip?: T;
   zumba?: T;
   box?: T;

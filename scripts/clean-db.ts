@@ -4,6 +4,8 @@ import { getPayload } from 'payload'
 
 import config from '../src/payload.config'
 
+type PayloadInstance = Awaited<ReturnType<typeof getPayload>>
+
 type CleanResult = {
   collection: string
   deleted: number
@@ -52,30 +54,50 @@ async function cleanCollection(
   } satisfies CleanResult
 }
 
-async function main() {
-  const includeUsers = process.argv.includes('--include-users')
-  const payloadInstance = await getPayload({ config })
+const closePayload = async (payloadInstance: PayloadInstance | null) => {
+  const db = payloadInstance?.db
+  if (!db) return
 
-  const order: CleanableCollection[] = ['pagos', 'logs', 'clientes', 'configuraciones', 'media']
-  if (includeUsers) order.push('users')
-
-  console.log('🧹 Limpiando base de datos...')
-  if (includeUsers) {
-    console.log('⚠️ Incluyendo usuarios (--include-users)')
+  const destroy = 'destroy' in db ? db.destroy : null
+  if (typeof destroy === 'function') {
+    await destroy.call(db)
   }
-
-  const results: CleanResult[] = []
-  for (const collection of order) {
-    const result = await cleanCollection(payloadInstance, collection)
-    results.push(result)
-    console.log(`  ✓ ${collection}: ${result.deleted} eliminados`)
-  }
-
-  const total = results.reduce((sum, item) => sum + item.deleted, 0)
-  console.log(`\n✅ Limpieza completada. Registros eliminados: ${total}`)
 }
 
-main().catch((error) => {
-  console.error('❌ Error limpiando base de datos:', error)
-  process.exit(1)
-})
+async function main() {
+  let payloadInstance: PayloadInstance | null = null
+
+  try {
+    const includeUsers = process.argv.includes('--include-users')
+    payloadInstance = await getPayload({ config })
+
+    const order: CleanableCollection[] = ['pagos', 'logs', 'clientes', 'configuraciones', 'media']
+    if (includeUsers) order.push('users')
+
+    console.log('🧹 Limpiando base de datos...')
+    if (includeUsers) {
+      console.log('⚠️ Incluyendo usuarios (--include-users)')
+    }
+
+    const results: CleanResult[] = []
+    for (const collection of order) {
+      const result = await cleanCollection(payloadInstance, collection)
+      results.push(result)
+      console.log(`  ✓ ${collection}: ${result.deleted} eliminados`)
+    }
+
+    const total = results.reduce((sum, item) => sum + item.deleted, 0)
+    console.log(`\n✅ Limpieza completada. Registros eliminados: ${total}`)
+  } finally {
+    await closePayload(payloadInstance)
+  }
+}
+
+main()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('❌ Error limpiando base de datos:', error)
+    process.exit(1)
+  })

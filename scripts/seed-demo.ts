@@ -5,6 +5,8 @@ import { getPayload } from 'payload'
 import { METODO_PAGO_OPTIONS, TURNO_OPTIONS, type TipoServicio } from '../src/constants/domain'
 import config from '../src/payload.config'
 
+type PayloadInstance = Awaited<ReturnType<typeof getPayload>>
+
 type DemoClient = {
   name: string
   lastName: string
@@ -238,6 +240,16 @@ async function seedUsers(payloadInstance: Awaited<ReturnType<typeof getPayload>>
   }
 }
 
+const closePayload = async (payloadInstance: PayloadInstance | null) => {
+  const db = payloadInstance?.db
+  if (!db) return
+
+  const destroy = 'destroy' in db ? db.destroy : null
+  if (typeof destroy === 'function') {
+    await destroy.call(db)
+  }
+}
+
 async function seedClients(payloadInstance: Awaited<ReturnType<typeof getPayload>>) {
   const upsertedClientIds: Array<number | string> = []
 
@@ -463,47 +475,57 @@ async function resetDemoData(payloadInstance: Awaited<ReturnType<typeof getPaylo
 }
 
 async function main() {
-  const payloadInstance = await getPayload({ config })
-  const shouldReset = process.argv.includes('--reset')
+  let payloadInstance: PayloadInstance | null = null
 
-  if (shouldReset) {
-    await resetDemoData(payloadInstance)
+  try {
+    payloadInstance = await getPayload({ config })
+    const shouldReset = process.argv.includes('--reset')
+
+    if (shouldReset) {
+      await resetDemoData(payloadInstance)
+    }
+
+    await seedUsers(payloadInstance)
+    const clientIds = await seedClients(payloadInstance)
+    await seedHistoricalPayments(payloadInstance, clientIds)
+
+    const current = new Date()
+    const pagosCurrentMonth = await payloadInstance.find({
+      collection: 'pagos',
+      where: {
+        and: [
+          {
+            mesPago: {
+              equals: current.getMonth(),
+            },
+          },
+          {
+            anioPago: {
+              equals: current.getFullYear(),
+            },
+          },
+        ],
+      },
+      depth: 0,
+      limit: 200,
+    })
+
+    console.log('Seed demo completado')
+    console.log(`Usuarios demo: ${DEMO_USERS.length}`)
+    console.log(`Clientes demo: ${DEMO_CLIENTS.length}`)
+    console.log(`Pagos del mes actual: ${pagosCurrentMonth.totalDocs}`)
+    console.log(`Login admin: admin@${DEMO_DOMAIN} / admin123`)
+    console.log(`Login staff: staff@${DEMO_DOMAIN} / staff123`)
+  } finally {
+    await closePayload(payloadInstance)
   }
-
-  await seedUsers(payloadInstance)
-  const clientIds = await seedClients(payloadInstance)
-  await seedHistoricalPayments(payloadInstance, clientIds)
-
-  const current = new Date()
-  const pagosCurrentMonth = await payloadInstance.find({
-    collection: 'pagos',
-    where: {
-      and: [
-        {
-          mesPago: {
-            equals: current.getMonth(),
-          },
-        },
-        {
-          anioPago: {
-            equals: current.getFullYear(),
-          },
-        },
-      ],
-    },
-    depth: 0,
-    limit: 200,
-  })
-
-  console.log('Seed demo completado')
-  console.log(`Usuarios demo: ${DEMO_USERS.length}`)
-  console.log(`Clientes demo: ${DEMO_CLIENTS.length}`)
-  console.log(`Pagos del mes actual: ${pagosCurrentMonth.totalDocs}`)
-  console.log(`Login admin: admin@${DEMO_DOMAIN} / admin123`)
-  console.log(`Login staff: staff@${DEMO_DOMAIN} / staff123`)
 }
 
-main().catch((error) => {
-  console.error('Error ejecutando seed demo:', error)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('Error ejecutando seed demo:', error)
+    process.exit(1)
+  })

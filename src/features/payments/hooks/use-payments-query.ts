@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { apiClient } from '@/lib/api-client'
 import { queryKeys } from '@/lib/query-keys'
 import type { Payment } from '@/types'
+import { isVipServiceType, VIP_TURNO_VALUE } from '@/features/clients/schemas/client-form.schema'
 
 type BackendCliente = {
   id: number
@@ -37,7 +38,7 @@ const TURNO_BACKEND_TO_UI: Record<string, Payment['turno']> = {
   'de 7:00 pm a 8:00 pm': '19:00',
 }
 
-const TURNO_UI_TO_BACKEND: Record<Payment['turno'], string> = {
+const TURNO_UI_TO_BACKEND: Record<Exclude<Payment['turno'], 'VIP'>, string> = {
   '07:00': 'de 7:00 am a 8:00 am',
   '08:00': 'de 8:00 am a 9:00 am',
   '09:00': 'de 9:00 am a 10:00 am',
@@ -52,8 +53,17 @@ const TURNO_UI_TO_BACKEND: Record<Payment['turno'], string> = {
   '19:00': 'de 7:00 pm a 8:00 pm',
 }
 
+const mapTurnoToBackend = (turno: Payment['turno']): string | null => {
+  if (turno === VIP_TURNO_VALUE) {
+    return null
+  }
+
+  return TURNO_UI_TO_BACKEND[turno]
+}
+
 const mapPayment = (payment: BackendPago): Payment => {
   const relatedClient = typeof payment.cliente === 'object' ? payment.cliente : null
+  const isVip = isVipServiceType(payment.tipoServicio)
 
   return {
     id: String(payment.id),
@@ -71,9 +81,13 @@ const mapPayment = (payment: BackendPago): Payment => {
     anio: payment.anioPago,
     metodoPago: payment.metodoPago ?? 'Efectivo',
     tipoServicio: payment.tipoServicio,
-    turno: payment.turno ? (TURNO_BACKEND_TO_UI[payment.turno] ?? '08:00') : '08:00',
+    turno:
+      payment.turno == null
+        ? isVip
+          ? VIP_TURNO_VALUE
+          : '08:00'
+        : (TURNO_BACKEND_TO_UI[payment.turno] ?? '08:00'),
     fecha: payment.fechaPago,
-    estado: 'Completado',
   }
 }
 
@@ -214,10 +228,7 @@ export const useCreatePaymentMutation = () => {
         monto: data.monto,
         metodoPago: data.metodoPago,
         tipoServicio: data.tipoServicio,
-        turno:
-          data.tipoServicio === 'VIP' || data.tipoServicio === 'VIP + Zumba y Box'
-            ? null
-            : TURNO_UI_TO_BACKEND[data.turno],
+        turno: isVipServiceType(data.tipoServicio) ? null : mapTurnoToBackend(data.turno),
         fechaPago: new Date().toISOString().split('T')[0],
         mesPago: data.mes,
         anioPago: data.anio,
@@ -245,7 +256,11 @@ export const useUpdatePaymentMutation = () => {
         ...(data.monto !== undefined ? { monto: data.monto } : {}),
         ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
         ...(data.tipoServicio ? { tipoServicio: data.tipoServicio } : {}),
-        ...(data.turno ? { turno: TURNO_UI_TO_BACKEND[data.turno] } : {}),
+        ...((data.turno || data.tipoServicio) && isVipServiceType(data.tipoServicio ?? 'Normal')
+          ? { turno: null }
+          : data.turno
+            ? { turno: mapTurnoToBackend(data.turno) }
+            : {}),
         ...(data.mes !== undefined ? { mesPago: data.mes } : {}),
         ...(data.anio !== undefined ? { anioPago: data.anio } : {}),
       })

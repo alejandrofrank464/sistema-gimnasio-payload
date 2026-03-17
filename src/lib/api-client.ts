@@ -44,7 +44,23 @@ const trackedFetch = async (url: string, init?: RequestInit): Promise<Response> 
 
 export const apiClient = {
   clientes: {
-    list: () => authFetch('/api/clientes?limit=500&depth=0&sort=name'),
+    list: (params?: { page?: number; limit?: number; search?: string }) => {
+      const searchParams = new URLSearchParams({
+        depth: '0',
+        sort: 'name',
+        page: String(params?.page ?? 1),
+        limit: String(params?.limit ?? 500),
+      })
+
+      const search = params?.search?.trim()
+      if (search) {
+        searchParams.set('where[or][0][name][like]', search)
+        searchParams.set('where[or][1][lastName][like]', search)
+        searchParams.set('where[or][2][phone][like]', search)
+      }
+
+      return authFetch(`/api/clientes?${searchParams.toString()}`)
+    },
     create: (body: unknown) =>
       authFetch('/api/clientes', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: unknown) =>
@@ -85,28 +101,67 @@ export const apiClient = {
     remove: (id: string) => authFetch(`/api/pagos/${id}`, { method: 'DELETE' }),
   },
   logs: {
-    list: (params?: { page?: number; limit?: number; search?: string }) => {
+    list: (params?: {
+      page?: number
+      limit?: number
+      search?: string
+      entity?: 'all' | 'Cliente' | 'Pago' | 'Ajuste'
+      action?: 'all' | 'Crear' | 'Editar' | 'Eliminar'
+      sortDate?: 'asc' | 'desc'
+    }) => {
       const searchParams = new URLSearchParams({
         depth: '0',
-        sort: '-createdAt',
+        sort: params?.sortDate === 'asc' ? 'createdAt' : '-createdAt',
         page: String(params?.page ?? 1),
         limit: String(params?.limit ?? 25),
       })
 
+      let andIndex = 0
+
+      if (params?.entity && params.entity !== 'all') {
+        searchParams.set(`where[and][${andIndex}][entidad][equals]`, params.entity)
+        andIndex += 1
+      }
+
+      if (params?.action && params.action !== 'all') {
+        const actionMap: Record<'Crear' | 'Editar' | 'Eliminar', string[]> = {
+          Crear: ['crear_cliente', 'crear_pago'],
+          Editar: ['editar_cliente', 'editar_pago'],
+          Eliminar: ['eliminar_cliente', 'eliminar_pago'],
+        }
+
+        const rawActions = actionMap[params.action]
+        rawActions.forEach((action, index) => {
+          searchParams.set(`where[and][${andIndex}][or][${index}][accion][equals]`, action)
+        })
+        andIndex += 1
+      }
+
       const search = params?.search?.trim()
       if (search) {
-        searchParams.set('where[or][0][entidad][like]', search)
-        searchParams.set('where[or][1][accion][like]', search)
-        searchParams.set('where[or][2][nombreCompleto][like]', search)
-        searchParams.set('where[or][3][usuario][like]', search)
+        searchParams.set(`where[and][${andIndex}][or][0][nombreCompleto][like]`, search)
+        searchParams.set(`where[and][${andIndex}][or][1][usuario][like]`, search)
       }
 
       return authFetch(`/api/logs?${searchParams.toString()}`)
     },
   },
   settings: {
+    name: () => trackedFetch('/api/configuraciones/nombre'),
     prices: () => trackedFetch('/api/configuraciones/precios'),
     logo: () => trackedFetch('/api/configuraciones/logo'),
+    uploadLogo: (file: File) => {
+      const form = new FormData()
+      form.append('logo', file)
+
+      return trackedFetch('/api/configuraciones/logo', {
+        method: 'POST',
+        body: form,
+        headers: {
+          ...(getToken() ? { Authorization: `JWT ${getToken()}` } : {}),
+        },
+      })
+    },
     upsert: (clave: string, valor: string | number) =>
       trackedFetch('/api/configuraciones/upsert', {
         method: 'POST',

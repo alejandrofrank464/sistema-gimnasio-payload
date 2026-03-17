@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiClient } from '@/lib/api-client'
 import { queryKeys } from '@/lib/query-keys'
-import type { Client, Settings, TipoServicio, Turno } from '@/types'
+import type { Client, MetodoPago, Settings, TipoServicio, Turno } from '@/types'
 
 type BackendCliente = {
   id: number
@@ -10,6 +10,8 @@ type BackendCliente = {
   lastName: string
   phone: string
   email?: string | null
+  notes?: string | null
+  metodoPago?: MetodoPago | null
   vip?: boolean | null
   zumba?: boolean | null
   box?: boolean | null
@@ -117,11 +119,12 @@ const mapClients = (clientes: BackendCliente[], settings: Settings): Client[] =>
       apellido: cliente.lastName,
       telefono: cliente.phone,
       email: cliente.email || '',
+      metodoPago: cliente.metodoPago ?? 'Efectivo',
       tipoServicio,
       turno: cliente.turno ? (TURNO_BACKEND_TO_UI[cliente.turno] ?? '08:00') : '08:00',
       precioMensual,
       fechaRegistro: cliente.createdAt?.split('T')[0] ?? '',
-      notas: '',
+      notas: cliente.notes || '',
     }
   })
 }
@@ -146,8 +149,23 @@ const tipoServicioFlags = (tipoServicio: TipoServicio) => {
 const invalidateClientRelatedQueries = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.clients }),
+    queryClient.invalidateQueries({ queryKey: ['clients', 'list'] }),
     queryClient.invalidateQueries({ queryKey: queryKeys.payments }),
   ])
+}
+
+type PaginatedClientsResult = {
+  docs: Client[]
+  totalDocs: number
+  totalPages: number
+  page: number
+}
+
+type BackendPaginatedClientsResponse = {
+  docs?: BackendCliente[]
+  totalDocs?: number
+  totalPages?: number
+  page?: number
 }
 
 export const useClientsQuery = (settings: Settings) => {
@@ -163,6 +181,28 @@ export const useClientsQuery = (settings: Settings) => {
   })
 }
 
+export const useClientsListQuery = (
+  settings: Settings,
+  params: { page: number; limit: number; search?: string },
+) => {
+  return useQuery({
+    queryKey: queryKeys.clientsList(params),
+    queryFn: async (): Promise<PaginatedClientsResult> => {
+      const response = await apiClient.clientes.list(params)
+      const json = (await response.json()) as BackendPaginatedClientsResponse
+
+      return {
+        docs: mapClients(json.docs ?? [], settings),
+        totalDocs: json.totalDocs ?? 0,
+        totalPages: json.totalPages ?? 1,
+        page: json.page ?? params.page,
+      }
+    },
+    staleTime: 2 * 60_000,
+    gcTime: 20 * 60_000,
+  })
+}
+
 export const useCreateClientMutation = () => {
   const queryClient = useQueryClient()
 
@@ -174,7 +214,8 @@ export const useCreateClientMutation = () => {
         lastName: data.apellido,
         phone: data.telefono,
         email: data.email || null,
-        metodoPago: 'Efectivo',
+        notes: data.notas || null,
+        metodoPago: data.metodoPago,
         turno: flags.vip ? null : TURNO_UI_TO_BACKEND[data.turno],
         ...flags,
       })
@@ -196,6 +237,8 @@ export const useUpdateClientMutation = () => {
         ...(data.apellido ? { lastName: data.apellido } : {}),
         ...(data.telefono ? { phone: data.telefono } : {}),
         ...(data.email !== undefined ? { email: data.email || null } : {}),
+        ...(data.notas !== undefined ? { notes: data.notas || null } : {}),
+        ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
         ...(data.turno ? { turno: TURNO_UI_TO_BACKEND[data.turno] } : {}),
         ...(flags || {}),
       })
