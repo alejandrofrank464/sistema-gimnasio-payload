@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useData } from '@/lib/data-context'
+import { Search } from 'lucide-react'
 
 export default function LogsPage() {
   const { logs } = useData()
@@ -27,12 +28,15 @@ export default function LogsPage() {
   return (
     <div>
       <PageHeader title="Logs" description={`${logs.length} eventos registrados`}>
-        <Input
-          placeholder="Buscar log..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="bg-background w-[240px]"
-        />
+        <div className="relative">
+          <Search className="text-muted-foreground absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+          <Input
+            placeholder="Buscar log..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-background h-9 w-50 pl-8 text-sm sm:w-65"
+          />
+        </div>
       </PageHeader>
 
       {filtered.length === 0 ? (

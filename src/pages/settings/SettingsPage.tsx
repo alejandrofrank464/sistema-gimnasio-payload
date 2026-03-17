@@ -104,7 +104,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="mt-6">
-        <Button onClick={handleSave}>
+        <Button size="lg" onClick={handleSave}>
           <Save className="mr-1.5 h-4 w-4" /> Guardar Cambios
         </Button>
       </div>

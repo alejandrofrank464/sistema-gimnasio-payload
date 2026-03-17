@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
 import { useData } from '../../lib/data-context'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const { settings } = useData()
@@ -29,11 +30,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <SidebarInset className="min-w-0">
         <header className="border-border bg-card flex h-12 shrink-0 items-center border-b px-4">
           <SidebarTrigger className="mr-3" />
-          <span className="text-foreground truncate text-sm font-semibold">
+          <span className="text-foreground truncate text-lg font-semibold">
             {settings.nombreGimnasio}
           </span>
           <div className="ml-auto">
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="lg" onClick={handleLogout}>
               Salir
             </Button>
           </div>

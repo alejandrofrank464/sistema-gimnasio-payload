@@ -69,7 +69,7 @@ export default function ClientsPage() {
               setSearch(e.target.value)
               setPage(0)
             }}
-            className="bg-background h-9 w-[200px] pl-8 text-sm sm:w-[260px]"
+            className="bg-background h-9 w-50 pl-8 text-sm sm:w-65"
           />
         </div>
       </PageHeader>

@@ -34,7 +34,12 @@ export default function ClientDetailPage() {
 
   return (
     <div>
-      <Button variant="ghost" size="sm" className="mb-4" onClick={() => router.push('/clientes')}>
+      <Button
+        variant="ghost"
+        size="lg"
+        className="mb-4 text-sm"
+        onClick={() => router.push('/clientes')}
+      >
         <ArrowLeft className="mr-1 h-4 w-4" /> Volver a Clientes
       </Button>
 
