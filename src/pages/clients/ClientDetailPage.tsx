@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useData } from '@/lib/data-context'
 import { MESES } from '@/types'
@@ -8,13 +9,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge, PaymentStatusBadge } from '@/components/shared/StatusBadge'
 import { ArrowLeft, Phone, Mail, Calendar, FileText } from 'lucide-react'
+import { useClientsQuery } from '@/features/clients/hooks/use-clients-query'
+import { useClientPaymentsInfiniteQuery } from '@/features/payments/hooks/use-payments-query'
 
 export default function ClientDetailPage() {
   const params = useParams<{ id: string }>()
   const rawId = params?.id
   const id = Array.isArray(rawId) ? rawId[0] : rawId
   const router = useRouter()
-  const { clients, getClientPayments } = useData()
+  const { settings } = useData()
+  const { data: clients = [] } = useClientsQuery(settings)
+  const {
+    data: paymentsPages,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useClientPaymentsInfiniteQuery(id, 25)
 
   const client = id ? clients.find((c) => c.id === id) : undefined
   if (!client) {
@@ -28,9 +38,15 @@ export default function ClientDetailPage() {
     )
   }
 
-  const payments = getClientPayments(client.id)
+  const paymentsByClient = useMemo(
+    () => paymentsPages?.pages.flatMap((page) => page.docs) ?? [],
+    [paymentsPages],
+  )
+
   const now = new Date()
-  const isActive = payments.some((p) => p.mes === now.getMonth() && p.anio === now.getFullYear())
+  const isActive = paymentsByClient.some(
+    (p) => p.mes === now.getMonth() && p.anio === now.getFullYear(),
+  )
 
   return (
     <div>
@@ -94,33 +110,47 @@ export default function ClientDetailPage() {
             <CardTitle className="text-lg">Historial de Pagos</CardTitle>
           </CardHeader>
           <CardContent>
-            {payments.length === 0 ? (
+            {paymentsByClient.length === 0 ? (
               <p className="text-muted-foreground py-8 text-center text-sm">
                 No hay pagos registrados.
               </p>
             ) : (
-              <div className="space-y-2">
-                {payments.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-background border-border flex items-center justify-between rounded-md border px-3 py-2.5"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">
-                        {MESES[p.mes]} {p.anio}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {p.metodoPago} · {p.tipoServicio} · {p.turno}
-                      </p>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  {paymentsByClient.map((p) => (
+                    <div
+                      key={p.id}
+                      className="bg-background border-border flex items-center justify-between rounded-md border px-3 py-2.5"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">
+                          {MESES[p.mes]} {p.anio}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {p.metodoPago} · {p.tipoServicio} · {p.turno}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-success text-sm font-medium tabular-nums">
+                          ${p.monto}
+                        </span>
+                        <PaymentStatusBadge estado={p.estado} />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-success text-sm font-medium tabular-nums">
-                        ${p.monto}
-                      </span>
-                      <PaymentStatusBadge estado={p.estado} />
-                    </div>
+                  ))}
+                </div>
+
+                {hasNextPage && (
+                  <div className="pt-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => void fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? 'Cargando...' : 'Cargar mas pagos'}
+                    </Button>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </CardContent>

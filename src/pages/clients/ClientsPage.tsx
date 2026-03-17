@@ -12,11 +12,28 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  useClientsQuery,
+  useCreateClientMutation,
+  useDeleteClientMutation,
+  useUpdateClientMutation,
+} from '@/features/clients/hooks/use-clients-query'
+import { usePaymentsQueryFiltered } from '@/features/payments/hooks/use-payments-query'
 
 const PAGE_SIZE = 10
 
 export default function ClientsPage() {
-  const { clients, payments, deleteClient } = useData()
+  const { settings } = useData()
+  const { data: clients = [] } = useClientsQuery(settings)
+  const now = new Date()
+  const { data: payments = [] } = usePaymentsQueryFiltered({
+    month: now.getMonth(),
+    year: now.getFullYear(),
+    limit: 1000,
+  })
+  const createClientMutation = useCreateClientMutation()
+  const updateClientMutation = useUpdateClientMutation()
+  const deleteClientMutation = useDeleteClientMutation()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [formOpen, setFormOpen] = useState(false)
@@ -42,11 +59,19 @@ export default function ClientsPage() {
 
   const handleDelete = () => {
     if (deleteTarget) {
-      void deleteClient(deleteTarget.id).then(() => {
+      void deleteClientMutation.mutateAsync(deleteTarget.id).then(() => {
         toast.success('Cliente eliminado. Los pagos históricos se conservan.')
       })
       setDeleteTarget(null)
     }
+  }
+
+  const handleCreateClient = async (data: Omit<Client, 'id' | 'fechaRegistro'>) => {
+    await createClientMutation.mutateAsync(data)
+  }
+
+  const handleUpdateClient = async (id: string, data: Partial<Client>) => {
+    await updateClientMutation.mutateAsync({ id, data })
   }
 
   return (
@@ -122,7 +147,14 @@ export default function ClientsPage() {
         </>
       )}
 
-      <ClientForm open={formOpen} onOpenChange={setFormOpen} client={editClient} />
+      <ClientForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        client={editClient}
+        settings={settings}
+        onCreate={handleCreateClient}
+        onUpdate={handleUpdateClient}
+      />
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}

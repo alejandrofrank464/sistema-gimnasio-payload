@@ -6,66 +6,19 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
+import { usePathname } from 'next/navigation'
 
-import { initialSettings } from '@/lib/mock-data'
-import type { Client, LogEntry, Payment, Settings, TipoServicio, Turno } from '@/types'
+import { apiClient } from '@/lib/api-client'
+import type { Settings, TipoServicio } from '@/types'
 
-interface DataContextType {
-  clients: Client[]
-  payments: Payment[]
-  logs: LogEntry[]
+type DataContextType = {
   settings: Settings
   loading: boolean
-  refresh: () => Promise<void>
-  addClient: (client: Omit<Client, 'id' | 'fechaRegistro'>) => Promise<void>
-  updateClient: (id: string, data: Partial<Client>) => Promise<void>
-  deleteClient: (id: string) => Promise<void>
-  addPayment: (
-    payment: Omit<Payment, 'id' | 'fecha'>,
-  ) => Promise<{ success: boolean; error?: string }>
-  updatePayment: (id: string, data: Partial<Payment>) => Promise<void>
-  deletePayment: (id: string) => Promise<void>
   updateSettings: (data: Partial<Settings>) => Promise<void>
-  getClientPayments: (clientId: string) => Payment[]
-  getActiveClients: (mes: number, anio: number) => (Client & { pagado: boolean })[]
-}
-
-type BackendCliente = {
-  id: number
-  name: string
-  lastName: string
-  phone: string
-  email?: string | null
-  vip?: boolean | null
-  zumba?: boolean | null
-  box?: boolean | null
-  turno?: string | null
-  createdAt?: string
-}
-
-type BackendPago = {
-  id: number
-  monto: number
-  metodoPago?: 'Efectivo' | 'Tarjeta' | null
-  tipoServicio: TipoServicio
-  fechaPago: string
-  mesPago: number
-  anioPago: number
-  turno?: string | null
-  cliente?: number | BackendCliente | null
-}
-
-type BackendLog = {
-  id: number
-  accion: string
-  entidad: string
-  usuario?: string | null
-  nombreCompleto?: string | null
-  createdAt: string
-  detalles?: unknown
 }
 
 type PriceMap = {
@@ -78,36 +31,6 @@ type PriceMap = {
 
 const DataContext = createContext<DataContextType | null>(null)
 
-const TURNO_BACKEND_TO_UI: Record<string, Turno> = {
-  'de 7:00 am a 8:00 am': '07:00',
-  'de 8:00 am a 9:00 am': '08:00',
-  'de 9:00 am a 10:00 am': '09:00',
-  'de 10:00 am a 11:00 am': '10:00',
-  'de 11:00 am a 12:00 pm': '11:00',
-  'de 1:00 pm a 2:00 pm': '13:00',
-  'de 2:00 pm a 3:00 pm': '14:00',
-  'de 3:00 pm a 4:00 pm': '15:00',
-  'de 4:00 pm a 5:00 pm': '16:00',
-  'de 5:00 pm a 6:00 pm': '17:00',
-  'de 6:00 pm a 7:00 pm': '18:00',
-  'de 7:00 pm a 8:00 pm': '19:00',
-}
-
-const TURNO_UI_TO_BACKEND: Record<Turno, string> = {
-  '07:00': 'de 7:00 am a 8:00 am',
-  '08:00': 'de 8:00 am a 9:00 am',
-  '09:00': 'de 9:00 am a 10:00 am',
-  '10:00': 'de 10:00 am a 11:00 am',
-  '11:00': 'de 11:00 am a 12:00 pm',
-  '13:00': 'de 1:00 pm a 2:00 pm',
-  '14:00': 'de 2:00 pm a 3:00 pm',
-  '15:00': 'de 3:00 pm a 4:00 pm',
-  '16:00': 'de 4:00 pm a 5:00 pm',
-  '17:00': 'de 5:00 pm a 6:00 pm',
-  '18:00': 'de 6:00 pm a 7:00 pm',
-  '19:00': 'de 7:00 pm a 8:00 pm',
-}
-
 const DEFAULT_PRICES: PriceMap = {
   precio_normal: 30,
   precio_vip: 50,
@@ -116,10 +39,28 @@ const DEFAULT_PRICES: PriceMap = {
   precio_vip_zumba_y_box: 80,
 }
 
-export function useData() {
-  const ctx = useContext(DataContext)
-  if (!ctx) throw new Error('useData must be used within DataProvider')
-  return ctx
+const DEFAULT_SETTINGS: Settings = {
+  nombreGimnasio: 'Gym',
+  precios: [
+    { tipoServicio: 'Normal', precio: DEFAULT_PRICES.precio_normal },
+    { tipoServicio: 'VIP', precio: DEFAULT_PRICES.precio_vip },
+    { tipoServicio: 'Zumba', precio: DEFAULT_PRICES.precio_zumba_o_box },
+    { tipoServicio: 'Box', precio: DEFAULT_PRICES.precio_zumba_o_box },
+    { tipoServicio: 'Zumba y Box', precio: DEFAULT_PRICES.precio_zumba_y_box },
+    { tipoServicio: 'VIP + Zumba y Box', precio: DEFAULT_PRICES.precio_vip_zumba_y_box },
+  ],
+  logoUrl: '',
+}
+
+const SETTINGS_CACHE_TTL_MS = 10 * 60 * 1000
+
+const SETTINGS_KEY_MAP: Record<TipoServicio, keyof PriceMap> = {
+  Normal: 'precio_normal',
+  VIP: 'precio_vip',
+  Zumba: 'precio_zumba_o_box',
+  Box: 'precio_zumba_o_box',
+  'Zumba y Box': 'precio_zumba_y_box',
+  'VIP + Zumba y Box': 'precio_vip_zumba_y_box',
 }
 
 const getToken = (): string | null => {
@@ -127,366 +68,143 @@ const getToken = (): string | null => {
   return window.sessionStorage.getItem('gym_token')
 }
 
-const authHeaders = (): HeadersInit => {
-  const token = getToken()
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
+const settingsToPriceMap = (settings: Settings): PriceMap => {
+  const priceMap: PriceMap = { ...DEFAULT_PRICES }
 
-  if (token) {
-    headers.Authorization = `JWT ${token}`
-  }
-
-  return headers
-}
-
-const authFetch = async (url: string, init?: RequestInit): Promise<Response> => {
-  return fetch(url, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init?.headers || {}),
-    },
-    credentials: 'include',
-  })
-}
-
-const deriveServiceFromFlags = (cliente: BackendCliente): TipoServicio => {
-  if (cliente.vip && cliente.zumba && cliente.box) return 'VIP + Zumba y Box'
-  if (cliente.vip) return 'VIP'
-  if (cliente.zumba && cliente.box) return 'Zumba y Box'
-  if (cliente.zumba) return 'Zumba'
-  if (cliente.box) return 'Box'
-  return 'Normal'
-}
-
-const priceForService = (tipo: TipoServicio, prices: PriceMap): number => {
-  switch (tipo) {
-    case 'VIP + Zumba y Box':
-      return prices.precio_vip_zumba_y_box
-    case 'VIP':
-      return prices.precio_vip
-    case 'Zumba y Box':
-      return prices.precio_zumba_y_box
-    case 'Zumba':
-    case 'Box':
-      return prices.precio_zumba_o_box
-    default:
-      return prices.precio_normal
-  }
-}
-
-const mapPayment = (payment: BackendPago): Payment => {
-  const relatedClient = typeof payment.cliente === 'object' ? payment.cliente : null
-  return {
-    id: String(payment.id),
-    clienteId:
-      payment.cliente == null
-        ? null
-        : typeof payment.cliente === 'number'
-          ? String(payment.cliente)
-          : String(payment.cliente.id),
-    clienteNombre: relatedClient
-      ? `${relatedClient.name} ${relatedClient.lastName}`
-      : 'Cliente eliminado',
-    monto: payment.monto,
-    mes: payment.mesPago,
-    anio: payment.anioPago,
-    metodoPago: payment.metodoPago ?? 'Efectivo',
-    tipoServicio: payment.tipoServicio,
-    turno: payment.turno ? (TURNO_BACKEND_TO_UI[payment.turno] ?? '08:00') : '08:00',
-    fecha: payment.fechaPago,
-    estado: 'Completado',
-  }
-}
-
-const mapLog = (log: BackendLog): LogEntry => {
-  const accionMap: Record<string, LogEntry['accion']> = {
-    crear_cliente: 'Crear',
-    editar_cliente: 'Editar',
-    eliminar_cliente: 'Eliminar',
-    crear_pago: 'Crear',
-    editar_pago: 'Editar',
-    eliminar_pago: 'Eliminar',
-  }
-
-  const entidadMap: Record<string, LogEntry['entidad']> = {
-    Cliente: 'Cliente',
-    Pago: 'Pago',
-    Ajuste: 'Ajuste',
-  }
-
-  return {
-    id: String(log.id),
-    entidad: entidadMap[log.entidad] ?? 'Ajuste',
-    accion: accionMap[log.accion] ?? 'Editar',
-    descripcion: log.nombreCompleto || log.accion,
-    fecha: log.createdAt,
-    usuario: log.usuario || 'Sistema',
-  }
-}
-
-const mapClients = (
-  clientes: BackendCliente[],
-  payments: Payment[],
-  prices: PriceMap,
-): Client[] => {
-  return clientes.map((cliente) => {
-    const paymentsForClient = payments
-      .filter((payment) => payment.clienteId === String(cliente.id))
-      .sort((a, b) => b.anio * 12 + b.mes - (a.anio * 12 + a.mes))
-
-    const latest = paymentsForClient[0]
-    const tipoServicio = latest?.tipoServicio ?? deriveServiceFromFlags(cliente)
-    const precioMensual = latest?.monto ?? priceForService(tipoServicio, prices)
-
-    return {
-      id: String(cliente.id),
-      nombre: cliente.name,
-      apellido: cliente.lastName,
-      telefono: cliente.phone,
-      email: cliente.email || '',
-      tipoServicio,
-      turno: cliente.turno ? (TURNO_BACKEND_TO_UI[cliente.turno] ?? '08:00') : '08:00',
-      precioMensual,
-      fechaRegistro: cliente.createdAt?.split('T')[0] ?? '',
-      notas: '',
+  for (const item of settings.precios) {
+    if (item.tipoServicio === 'Normal') priceMap.precio_normal = item.precio
+    if (item.tipoServicio === 'VIP') priceMap.precio_vip = item.precio
+    if (item.tipoServicio === 'Zumba' || item.tipoServicio === 'Box') {
+      priceMap.precio_zumba_o_box = item.precio
     }
-  })
+    if (item.tipoServicio === 'Zumba y Box') priceMap.precio_zumba_y_box = item.precio
+    if (item.tipoServicio === 'VIP + Zumba y Box') priceMap.precio_vip_zumba_y_box = item.precio
+  }
+
+  return priceMap
 }
 
-const tipoServicioFlags = (tipoServicio: TipoServicio) => {
-  switch (tipoServicio) {
-    case 'VIP + Zumba y Box':
-      return { vip: true, zumba: true, box: true }
-    case 'VIP':
-      return { vip: true, zumba: false, box: false }
-    case 'Zumba y Box':
-      return { vip: false, zumba: true, box: true }
-    case 'Zumba':
-      return { vip: false, zumba: true, box: false }
-    case 'Box':
-      return { vip: false, zumba: false, box: true }
-    default:
-      return { vip: false, zumba: false, box: false }
-  }
+const priceMapToSettings = (priceMap: PriceMap, logoUrl: string): Settings => ({
+  ...DEFAULT_SETTINGS,
+  precios: [
+    { tipoServicio: 'Normal', precio: priceMap.precio_normal },
+    { tipoServicio: 'VIP', precio: priceMap.precio_vip },
+    { tipoServicio: 'Zumba', precio: priceMap.precio_zumba_o_box },
+    { tipoServicio: 'Box', precio: priceMap.precio_zumba_o_box },
+    { tipoServicio: 'Zumba y Box', precio: priceMap.precio_zumba_y_box },
+    { tipoServicio: 'VIP + Zumba y Box', precio: priceMap.precio_vip_zumba_y_box },
+  ],
+  logoUrl,
+})
+
+const isDashboardRoute = (pathname: string) => {
+  return (
+    pathname.startsWith('/clientes') ||
+    pathname.startsWith('/pagos') ||
+    pathname.startsWith('/horario') ||
+    pathname.startsWith('/ajustes')
+  )
+}
+
+export function useData() {
+  const ctx = useContext(DataContext)
+  if (!ctx) throw new Error('useData must be used within DataProvider')
+  return ctx
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState<Client[]>([])
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const [settings, setSettings] = useState<Settings>(initialSettings)
+  const pathname = usePathname() ?? ''
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
+  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS)
+  const settingsFetchedAtRef = useRef<number>(0)
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
+    settingsRef.current = settings
+  }, [settings])
+
+  const refreshSettings = useCallback(async (options?: { force?: boolean }) => {
     const token = getToken()
     if (!token) {
-      setClients([])
-      setPayments([])
-      setLogs([])
-      setSettings(initialSettings)
+      setSettings(DEFAULT_SETTINGS)
+      settingsFetchedAtRef.current = 0
+      return
+    }
+
+    const shouldUseCache =
+      !options?.force &&
+      settingsFetchedAtRef.current > 0 &&
+      Date.now() - settingsFetchedAtRef.current < SETTINGS_CACHE_TTL_MS
+
+    if (shouldUseCache) {
+      return
+    }
+
+    const [preciosRes, logoRes] = await Promise.all([
+      apiClient.settings.prices(),
+      apiClient.settings.logo(),
+    ])
+
+    const preciosJson = (await preciosRes.json()) as { data?: Partial<PriceMap> }
+    const logoJson = (await logoRes.json()) as { data?: { url?: string | null } | null }
+
+    const nextPriceMap: PriceMap = {
+      ...DEFAULT_PRICES,
+      ...(preciosJson.data || {}),
+    }
+
+    setSettings(priceMapToSettings(nextPriceMap, logoJson.data?.url || ''))
+    settingsFetchedAtRef.current = Date.now()
+  }, [])
+
+  useEffect(() => {
+    const shouldFetch = isDashboardRoute(pathname)
+    if (!shouldFetch) {
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    let mounted = true
 
-    try {
-      const [clientesRes, pagosRes, logsRes, preciosRes, logoRes] = await Promise.all([
-        authFetch('/api/clientes?limit=500&depth=0&sort=name'),
-        authFetch('/api/pagos?limit=1000&depth=1&sort=-fechaPago'),
-        authFetch('/api/logs?limit=500&depth=0&sort=-createdAt'),
-        fetch('/api/configuraciones/precios'),
-        fetch('/api/configuraciones/logo'),
-      ])
-
-      const clientesJson = (await clientesRes.json()) as { docs?: BackendCliente[] }
-      const pagosJson = (await pagosRes.json()) as { docs?: BackendPago[] }
-      const logsJson = (await logsRes.json()) as { docs?: BackendLog[] }
-      const preciosJson = (await preciosRes.json()) as { data?: Partial<PriceMap> }
-      const logoJson = (await logoRes.json()) as { data?: { url?: string | null } | null }
-
-      const priceMap = {
-        ...DEFAULT_PRICES,
-        ...(preciosJson.data || {}),
+    const run = async () => {
+      setLoading(true)
+      try {
+        await refreshSettings()
+      } finally {
+        if (mounted) setLoading(false)
       }
-
-      const mappedPayments = (pagosJson.docs ?? []).map(mapPayment)
-      const mappedClients = mapClients(clientesJson.docs ?? [], mappedPayments, priceMap)
-      const mappedLogs = (logsJson.docs ?? []).map(mapLog)
-
-      setPayments(mappedPayments)
-      setClients(mappedClients)
-      setLogs(mappedLogs)
-      setSettings({
-        ...initialSettings,
-        precios: [
-          { tipoServicio: 'Normal', precio: priceMap.precio_normal },
-          { tipoServicio: 'VIP', precio: priceMap.precio_vip },
-          { tipoServicio: 'Zumba', precio: priceMap.precio_zumba_o_box },
-          { tipoServicio: 'Box', precio: priceMap.precio_zumba_o_box },
-          { tipoServicio: 'Zumba y Box', precio: priceMap.precio_zumba_y_box },
-          { tipoServicio: 'VIP + Zumba y Box', precio: priceMap.precio_vip_zumba_y_box },
-        ],
-        logoUrl: logoJson.data?.url || '',
-      })
-    } finally {
-      setLoading(false)
     }
-  }, [])
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void run()
 
-  const addClient = useCallback(
-    async (data: Omit<Client, 'id' | 'fechaRegistro'>) => {
-      const flags = tipoServicioFlags(data.tipoServicio)
-      await authFetch('/api/clientes', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: data.nombre,
-          lastName: data.apellido,
-          phone: data.telefono,
-          email: data.email || null,
-          metodoPago: 'Efectivo',
-          turno: flags.vip ? null : TURNO_UI_TO_BACKEND[data.turno],
-          ...flags,
-        }),
-      })
-      await refresh()
-    },
-    [refresh],
-  )
-
-  const updateClient = useCallback(
-    async (id: string, data: Partial<Client>) => {
-      const flags = data.tipoServicio ? tipoServicioFlags(data.tipoServicio) : undefined
-      await authFetch(`/api/clientes/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          ...(data.nombre ? { name: data.nombre } : {}),
-          ...(data.apellido ? { lastName: data.apellido } : {}),
-          ...(data.telefono ? { phone: data.telefono } : {}),
-          ...(data.email !== undefined ? { email: data.email || null } : {}),
-          ...(data.turno ? { turno: TURNO_UI_TO_BACKEND[data.turno] } : {}),
-          ...(flags || {}),
-        }),
-      })
-      await refresh()
-    },
-    [refresh],
-  )
-
-  const deleteClient = useCallback(
-    async (id: string) => {
-      await authFetch(`/api/clientes/${id}`, {
-        method: 'DELETE',
-      })
-      await refresh()
-    },
-    [refresh],
-  )
-
-  const addPayment = useCallback(
-    async (data: Omit<Payment, 'id' | 'fecha'>) => {
-      const response = await authFetch('/api/pagos', {
-        method: 'POST',
-        body: JSON.stringify({
-          cliente: Number(data.clienteId),
-          monto: data.monto,
-          metodoPago: data.metodoPago,
-          tipoServicio: data.tipoServicio,
-          turno:
-            data.tipoServicio === 'VIP' || data.tipoServicio === 'VIP + Zumba y Box'
-              ? null
-              : TURNO_UI_TO_BACKEND[data.turno],
-          fechaPago: new Date().toISOString().split('T')[0],
-          mesPago: data.mes,
-          anioPago: data.anio,
-        }),
-      })
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          errors?: Array<{ message?: string }>
-        } | null
-        return {
-          success: false,
-          error: body?.errors?.[0]?.message || 'No se pudo registrar el pago.',
-        }
-      }
-
-      await refresh()
-      return { success: true }
-    },
-    [refresh],
-  )
-
-  const updatePayment = useCallback(
-    async (id: string, data: Partial<Payment>) => {
-      await authFetch(`/api/pagos/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          ...(data.monto !== undefined ? { monto: data.monto } : {}),
-          ...(data.metodoPago ? { metodoPago: data.metodoPago } : {}),
-          ...(data.tipoServicio ? { tipoServicio: data.tipoServicio } : {}),
-          ...(data.turno ? { turno: TURNO_UI_TO_BACKEND[data.turno] } : {}),
-          ...(data.mes !== undefined ? { mesPago: data.mes } : {}),
-          ...(data.anio !== undefined ? { anioPago: data.anio } : {}),
-        }),
-      })
-      await refresh()
-    },
-    [refresh],
-  )
-
-  const deletePayment = useCallback(
-    async (id: string) => {
-      await authFetch(`/api/pagos/${id}`, {
-        method: 'DELETE',
-      })
-      await refresh()
-    },
-    [refresh],
-  )
+    return () => {
+      mounted = false
+    }
+  }, [pathname, refreshSettings])
 
   const updateSettings = useCallback(
     async (data: Partial<Settings>) => {
-      if (data.nombreGimnasio) {
-        await fetch('/api/configuraciones/upsert', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ clave: 'nombre_gimnasio', valor: data.nombreGimnasio }),
-        })
+      const currentSettings = settingsRef.current
+      const currentPriceMap = settingsToPriceMap(currentSettings)
+
+      if (
+        data.nombreGimnasio !== undefined &&
+        data.nombreGimnasio.trim() !== '' &&
+        data.nombreGimnasio !== currentSettings.nombreGimnasio
+      ) {
+        await apiClient.settings.upsert('nombre_gimnasio', data.nombreGimnasio)
       }
 
       if (data.precios) {
-        const keyMap: Record<TipoServicio, keyof PriceMap> = {
-          Normal: 'precio_normal',
-          VIP: 'precio_vip',
-          Zumba: 'precio_zumba_o_box',
-          Box: 'precio_zumba_o_box',
-          'Zumba y Box': 'precio_zumba_y_box',
-          'VIP + Zumba y Box': 'precio_vip_zumba_y_box',
-        }
-
         const latestByKey = new Map<keyof PriceMap, number>()
         for (const item of data.precios) {
-          latestByKey.set(keyMap[item.tipoServicio], item.precio)
+          latestByKey.set(SETTINGS_KEY_MAP[item.tipoServicio], item.precio)
         }
 
         for (const [clave, valor] of latestByKey.entries()) {
-          await fetch('/api/configuraciones/upsert', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ clave, valor }),
-          })
+          if (currentPriceMap[clave] !== valor) {
+            await apiClient.settings.upsert(clave, valor)
+          }
         }
       }
 
@@ -494,72 +212,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setSettings((prev) => ({ ...prev, logoUrl: data.logoUrl || prev.logoUrl }))
       }
 
-      await refresh()
+      await refreshSettings({ force: true })
     },
-    [refresh],
-  )
-
-  const getClientPayments = useCallback(
-    (clientId: string) => {
-      return payments
-        .filter((payment) => payment.clienteId === clientId)
-        .sort((a, b) => {
-          const da = a.anio * 12 + a.mes
-          const db = b.anio * 12 + b.mes
-          return db - da
-        })
-    },
-    [payments],
-  )
-
-  const getActiveClients = useCallback(
-    (mes: number, anio: number) => {
-      return clients.map((client) => ({
-        ...client,
-        pagado: payments.some(
-          (payment) =>
-            payment.clienteId === client.id && payment.mes === mes && payment.anio === anio,
-        ),
-      }))
-    },
-    [clients, payments],
+    [refreshSettings],
   )
 
   const value = useMemo<DataContextType>(
     () => ({
-      clients,
-      payments,
-      logs,
       settings,
       loading,
-      refresh,
-      addClient,
-      updateClient,
-      deleteClient,
-      addPayment,
-      updatePayment,
-      deletePayment,
       updateSettings,
-      getClientPayments,
-      getActiveClients,
     }),
-    [
-      clients,
-      payments,
-      logs,
-      settings,
-      loading,
-      refresh,
-      addClient,
-      updateClient,
-      deleteClient,
-      addPayment,
-      updatePayment,
-      deletePayment,
-      updateSettings,
-      getClientPayments,
-      getActiveClients,
-    ],
+    [settings, loading, updateSettings],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

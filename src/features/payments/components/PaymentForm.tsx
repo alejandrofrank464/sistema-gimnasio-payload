@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod/v4'
 import {
+  Client,
   Payment,
   TIPOS_SERVICIO,
   TURNOS,
@@ -22,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useData } from '@/lib/data-context'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 
@@ -43,10 +43,19 @@ interface PaymentFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   payment?: Payment | null
+  clients: Client[]
+  onCreate: (data: Omit<Payment, 'id' | 'fecha'>) => Promise<{ success: boolean; error?: string }>
+  onUpdate: (id: string, data: Partial<Payment>) => Promise<void>
 }
 
-export function PaymentForm({ open, onOpenChange, payment }: PaymentFormProps) {
-  const { clients, addPayment, updatePayment } = useData()
+export function PaymentForm({
+  open,
+  onOpenChange,
+  payment,
+  clients,
+  onCreate,
+  onUpdate,
+}: PaymentFormProps) {
   const now = new Date()
 
   const {
@@ -114,10 +123,10 @@ export function PaymentForm({ open, onOpenChange, payment }: PaymentFormProps) {
     const clienteNombre = client ? `${client.nombre} ${client.apellido}` : 'Desconocido'
 
     if (payment) {
-      await updatePayment(payment.id, { ...data, clienteNombre } as Partial<Payment>)
+      await onUpdate(payment.id, { ...data, clienteNombre } as Partial<Payment>)
       toast.success('Pago actualizado')
     } else {
-      const result = await addPayment({ ...data, clienteNombre } as Omit<Payment, 'id' | 'fecha'>)
+      const result = await onCreate({ ...data, clienteNombre } as Omit<Payment, 'id' | 'fecha'>)
       if (!result.success) {
         toast.error(result.error || 'Error al crear pago')
         return
@@ -129,7 +138,7 @@ export function PaymentForm({ open, onOpenChange, payment }: PaymentFormProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-card border-border overflow-y-auto">
+      <SheetContent className="bg-card border-border overflow-y-auto p-2">
         <SheetHeader>
           <SheetTitle>{payment ? 'Editar Pago' : 'Nuevo Pago'}</SheetTitle>
         </SheetHeader>

@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useData } from '@/lib/data-context'
 import { useEffect } from 'react'
 
 const clientSchema = z.object({
@@ -34,11 +33,19 @@ interface ClientFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   client?: Client | null
+  settings: { precios: Array<{ tipoServicio: TipoServicio; precio: number }> }
+  onCreate: (data: Omit<Client, 'id' | 'fechaRegistro'>) => Promise<void>
+  onUpdate: (id: string, data: Partial<Client>) => Promise<void>
 }
 
-export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
-  const { addClient, updateClient, settings } = useData()
-
+export function ClientForm({
+  open,
+  onOpenChange,
+  client,
+  settings,
+  onCreate,
+  onUpdate,
+}: ClientFormProps) {
   const {
     register,
     handleSubmit,
@@ -98,16 +105,16 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
   const onSubmit = async (data: ClientFormData) => {
     if (client) {
-      await updateClient(client.id, data as Partial<Client>)
+      await onUpdate(client.id, data as Partial<Client>)
     } else {
-      await addClient(data as Omit<Client, 'id' | 'fechaRegistro'>)
+      await onCreate(data as Omit<Client, 'id' | 'fechaRegistro'>)
     }
     onOpenChange(false)
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-card border-border overflow-y-auto">
+      <SheetContent className="bg-card border-border overflow-y-auto p-2">
         <SheetHeader>
           <SheetTitle>{client ? 'Editar Cliente' : 'Nuevo Cliente'}</SheetTitle>
         </SheetHeader>

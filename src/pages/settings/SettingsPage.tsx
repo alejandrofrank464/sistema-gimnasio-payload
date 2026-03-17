@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useData } from '@/lib/data-context'
 import { TIPOS_SERVICIO } from '@/types'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -16,6 +16,12 @@ export default function SettingsPage() {
   const [nombre, setNombre] = useState(settings.nombreGimnasio)
   const [precios, setPrecios] = useState(settings.precios)
   const [logoPreview, setLogoPreview] = useState(settings.logoUrl)
+
+  useEffect(() => {
+    setNombre(settings.nombreGimnasio)
+    setPrecios(settings.precios)
+    setLogoPreview(settings.logoUrl)
+  }, [settings])
 
   const handleSave = async () => {
     await updateSettings({ nombreGimnasio: nombre, precios, logoUrl: logoPreview })
