@@ -1,76 +1,124 @@
-# Sistema Gimnasio Payload
+# Gym Management System
 
-Proyecto backend-first para migrar la logica de datos del sistema de gimnasio a Next.js + Payload + TypeScript.
+[![Next.js](https://img.shields.io/badge/Next.js-15-111827?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Payload CMS](https://img.shields.io/badge/Payload-3-000000)](https://payloadcms.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-2563eb?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-06b6d4?logo=react&logoColor=white)](https://react.dev/)
+[![TanStack Query](https://img.shields.io/badge/TanStack%20Query-v5-ef4444)](https://tanstack.com/query/latest)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-45ba63?logo=playwright&logoColor=white)](https://playwright.dev/)
 
-## Estado actual
+Business-oriented fullstack app designed to run a gym operation end-to-end: clients, payments, settings, and operational logs.
 
-Implementado en esta fase:
+Built with a backend-first mindset, explicit business rules, and a clean architecture ready for production.
 
-- Colecciones: users, media, clientes, pagos, configuraciones, logs.
-- Auth Payload con roles `admin` y `staff`.
-- Dashboard funcional con modulos:
-  - Clientes: create/read/update/delete + busqueda + detalle con historial de pagos.
-  - Pagos: create/read/update/delete + filtros por mes/anio.
-  - Horario: tabla por turnos usando pagos activos del mes.
-  - Ajustes: precios y carga de logo.
-  - Logs: tabla con filtros por entidad y accion.
-- Hooks de negocio:
-  - Crear cliente genera pago inicial automatico del mes actual.
-  - Editar cliente no modifica pagos existentes.
-  - Eliminar cliente conserva pagos historicos (desasocia `pago.cliente`).
-  - Logs minimos para CRUD de cliente y pago.
-- Regla anti-duplicado de pagos por `cliente + mesPago + anioPago`.
-- Endpoints de configuracion:
-  - `GET /api/configuraciones/precios`
-  - `POST /api/configuraciones/upsert`
-  - `GET /api/configuraciones/logo`
-  - `POST /api/configuraciones/logo`
+## Recruiter Snapshot
 
-## Requisitos
+This project showcases:
 
-- Node 20+
-- pnpm 10+
+- Real-world domain modeling with non-trivial business rules.
+- Headless CMS implementation with authentication and role-based access (`admin`, `staff`).
+- End-to-end TypeScript delivery across backend and frontend.
+- Migration-ready architecture for evolving legacy systems.
+- Engineering quality practices: generated types, integration tests, E2E tests, and seed scripts.
 
-## Inicio rapido (internet limitado)
+## Preview
 
-1. Copiar variables:
-   - `cp .env.example .env`
-2. Instalar:
-   - `pnpm install`
-3. Generar tipos:
-   - `pnpm generate:types`
-4. Levantar app:
-   - `pnpm dev`
+<table align="center">
+  <tr>
+    <td align="center"><b>Dashboard</b></td>
+    <td align="center"><b>Clients</b></td>
+    <td align="center"><b>Payments</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dashboard-general.png" width="300" alt="Dashboard"></td>
+    <td><img src="docs/screenshots/clientes-crud.png" width="300" alt="Clients"></td>
+    <td><img src="docs/screenshots/pagos-crud.png" width="300" alt="Payments"></td>
+  </tr>
+</table>
 
-## Configuracion de DB
+<table align="center">
+  <tr>
+    <td align="center"><b>Schedule</b></td>
+    <td align="center"><b>Settings</b></td>
+    <td align="center"><b>Logs</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/horario-turnos.png" width="300" alt="Schedule"></td>
+    <td><img src="docs/screenshots/configuraciones.png" width="300" alt="Settings"></td>
+    <td><img src="docs/screenshots/logs-auditoria.png" width="300" alt="Logs"></td>
+  </tr>
+</table>
 
-- Por defecto usa SQLite local con `DATABASE_URL=file:./sistema-gimnasio-payload.db`.
-- Si defines `POSTGRES_URL`, se activa automaticamente el adapter Postgres.
+## Highlights
 
-## Configuracion de Blob
+- Full CRUD for clients with payment history.
+- Full CRUD for monthly payments with month/year filtering.
+- Automatic initial payment generation when a client is created.
+- Anti-duplicate payment validation (`client + month + year`).
+- Shift schedule view powered by active monthly payments.
+- Business settings for pricing and brand logo.
+- Operational logs by entity and action.
 
-- Si defines `BLOB_READ_WRITE_TOKEN`, se activa storage en Vercel Blob para `media`.
-- Si no lo defines, Payload mantiene upload local.
+## Short Setup
 
-## Reglas de negocio de pagos al crear cliente
+```bash
+pnpm install
+cp .env.example .env
+pnpm generate:types
+pnpm dev
+```
 
-Prioridad de servicio y monto:
+Optional scripts:
 
-1. `vip && zumba && box` -> `VIP + Zumba y Box` -> `precio_vip_zumba_y_box`
-2. `vip` -> `VIP` -> `precio_vip`
-3. `zumba && box` -> `Zumba y Box` -> `precio_zumba_y_box`
-4. `zumba || box` -> `Zumba` o `Box` -> `precio_zumba_o_box`
-5. default -> `Normal` -> `precio_normal`
+- `pnpm seed:demo`
+- `pnpm seed:demo:reset`
+- `pnpm test:int`
+- `pnpm test:e2e`
 
-Defaults de precios si faltan configuraciones:
+## Base Stack
 
-- precio_normal: 30
-- precio_vip: 50
-- precio_zumba_o_box: 40
-- precio_zumba_y_box: 60
-- precio_vip_zumba_y_box: 80
+- Next.js 15 + React 19
+- Payload CMS 3
+- TypeScript
+- TanStack Query
+- Tailwind CSS + reusable UI components
+- SQLite (local default) / PostgreSQL compatible
+- Vercel Blob storage for media
+- Vitest + Playwright
 
-## Proximo bloque
+## Architecture
 
-- Agregar paginacion y filtros avanzados (VIP, servicio, rango de fechas).
-- Endurecer permisos por rol en acciones sensibles del frontend.
+```mermaid
+flowchart LR
+  A[Users Admin/Staff] --> B[Next.js App Router UI]
+  B --> C[Payload Collections]
+  C --> D[Business Hooks]
+  D --> E[(SQLite or PostgreSQL)]
+  C --> F[Custom Config API Endpoints]
+  C --> G[Vercel Blob Media]
+```
+
+## Notes
+
+- Core envs: `PAYLOAD_SECRET`, `DATABASE_URL`, `POSTGRES_URL`, `BLOB_READ_WRITE_TOKEN`.
+- The app runs locally with SQLite by default.
+- Planned production deployment target: **Vercel + Neon + Vercel Blob**.
+- Internet is required when using external storage or managed database services.
+
+## Demo
+
+- Live URL: [PENDING]
+- Demo credentials:
+  - Admin: [PENDING]
+  - Staff: [PENDING]
+
+## API Endpoints (Configuration)
+
+- `GET /api/configuraciones/precios`
+- `POST /api/configuraciones/upsert`
+- `GET /api/configuraciones/logo`
+- `POST /api/configuraciones/logo`
+
+## Spanish Version
+
+Read in Spanish: `README.es.md`
