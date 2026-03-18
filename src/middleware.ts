@@ -31,6 +31,10 @@ const isPublicPath = (pathname: string): boolean => {
   return pathname === ROOT_LOGIN_PATH
 }
 
+const isPayloadAdminPath = (pathname: string): boolean => {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
 const isPublicApiPath = (pathname: string): boolean => {
   return PUBLIC_API_PATHS.has(pathname)
 }
@@ -79,6 +83,10 @@ export function middleware(request: NextRequest) {
   }
 
   if (!isAuthenticated && !isApiPath && !isPublicPath(pathname)) {
+    if (isPayloadAdminPath(pathname)) {
+      return NextResponse.next()
+    }
+
     const nextUrl = request.nextUrl.clone()
     nextUrl.pathname = ROOT_LOGIN_PATH
     return NextResponse.redirect(nextUrl)
