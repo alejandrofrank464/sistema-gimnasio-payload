@@ -45,6 +45,10 @@ export const Clientes: CollectionConfig = {
       unique: true,
     },
     {
+      name: 'notes',
+      type: 'textarea',
+    },
+    {
       name: 'vip',
       type: 'checkbox',
       defaultValue: false,

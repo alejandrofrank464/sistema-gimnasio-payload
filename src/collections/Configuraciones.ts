@@ -7,7 +7,7 @@ export const Configuraciones: CollectionConfig = {
   access: {
     create: isAdminOrStaff,
     delete: isAdminOrStaff,
-    read: isAdminOrStaff,
+    read: () => true, // Permitir lectura pública para logo en login
     update: isAdminOrStaff,
   },
   admin: {
