@@ -57,7 +57,7 @@ flowchart LR
   A[Users Admin/Staff] --> B[Next.js App Router UI]
   B --> C[Payload Collections]
   C --> D[Business Hooks]
-  D --> E[(SQLite or PostgreSQL)]
+  D --> E[(PostgreSQL)]
   C --> F[Custom Config API Endpoints]
   C --> G[Vercel Blob Media]
 ```
@@ -67,7 +67,7 @@ flowchart LR
 - **TypeScript de extremo a extremo** en backend y frontend, con tipos generados desde el esquema de Payload.
 - **CMS headless como backend** — Payload CMS gestiona autenticación, colecciones y endpoints REST, eliminando código repetitivo sin perder control sobre la lógica de negocio.
 - **Reglas de negocio explícitas** — La validación anti-duplicados y la generación automática de pagos se aplican a nivel de hooks de colección, no en la UI.
-- **Arquitectura preparada para migración** — SQLite en local, PostgreSQL en producción. Cambiar entre ambos requiere solo una variable de entorno.
+- **Arquitectura exclusiva con PostgreSQL** — SQLite fue eliminado intencionalmente para garantizar compatibilidad total con entornos serverless (Vercel). Se requiere una instancia local de PostgreSQL o una base de datos gratuita en Neon incluso para desarrollo.
 - **Buenas prácticas de ingeniería** — Tipos generados, tests de integración (Vitest), tests E2E (Playwright) y scripts de seed para entornos de demo reproducibles.
  
 ---
@@ -81,8 +81,7 @@ flowchart LR
 | Language | TypeScript 5.7 |
 | Data fetching | TanStack Query v5 |
 | Styling | Tailwind CSS + reusable UI components |
-| Database (local) | SQLite |
-| Database (production) | PostgreSQL (Neon) |
+| Database | PostgreSQL (Neon recommended) |
 | Media storage | Vercel Blob |
 | Testing | Vitest (integration) + Playwright (E2E) |
 | Deployment target | Vercel |
@@ -103,11 +102,11 @@ pnpm dev
 | Variable | Descripción |
 |---|---|
 | `PAYLOAD_SECRET` | Clave secreta para la firma de sesiones de Payload CMS |
-| `DATABASE_URL` | Ruta SQLite para desarrollo local (ej. `file:./gym.db`) |
-| `POSTGRES_URL` | Cadena de conexión PostgreSQL para producción |
-| `BLOB_READ_WRITE_TOKEN` | Token de Vercel Blob para subida de archivos |
+| `POSTGRES_URL` | Cadena de conexión PostgreSQL (principal). Usa `DATABASE_URL` como alternativa si no está definida |
+| `DATABASE_URL` | Cadena de conexión alternativa (opcional) |
+| `BLOB_READ_WRITE_TOKEN` | Token de Vercel Blob para subida de archivos (opcional — deshabilita el almacenamiento de medios si no está definido) |
 
-> La app corre con SQLite por defecto. Configura POSTGRES_URL y cambia el adaptador de base de datos para el despliegue en producción.
+> La app requiere una base de datos PostgreSQL. Para desarrollo local puedes usar una instancia local de PostgreSQL o una base de datos gratuita en Neon. SQLite **no está soportado** — el adaptador fue eliminado para garantizar compatibilidad con entornos serverless como Vercel.
 
 ### Scripts opcionales
  
@@ -136,12 +135,15 @@ pnpm test:e2e           # Run E2E tests (Playwright)
 ---
  
 ## Despliegue
- 
+
 Stack de producción: **Vercel + Neon (PostgreSQL) + Vercel Blob**.
 
-1. Configura `POSTGRES_URL` y cambia el adaptador de base de datos en `payload.config.ts`.
-2. Configura `BLOB_READ_WRITE_TOKEN` para la subida de archivos multimedia.
-3. Despliega en Vercel — la app es totalmente compatible con entornos serverless.
+1. Crea una base de datos PostgreSQL en [Neon](https://neon.tech) o cualquier proveedor compatible.
+2. Configura `POSTGRES_URL` en las variables de entorno de Vercel.
+3. Configura `BLOB_READ_WRITE_TOKEN` para la subida de archivos (opcional — el almacenamiento de medios se deshabilita si el token no está presente).
+4. Despliega en Vercel — la app es totalmente compatible con entornos serverless.
+
+> Para desarrollo local, apunta `POSTGRES_URL` a una instancia local de PostgreSQL o a una rama de desarrollo en Neon.
  
 ---
  
