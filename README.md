@@ -142,6 +142,8 @@ Planned production stack: **Vercel + Neon (PostgreSQL) + Vercel Blob**.
 1. Set `POSTGRES_URL` and switch the database adapter in `payload.config.ts`.
 2. Configure `BLOB_READ_WRITE_TOKEN` for media uploads.
 3. Deploy to Vercel — the app is fully compatible with serverless environments.
+
+For a safe migration-first flow on every deploy, see [docs/deploy-safe-vercel.md](docs/deploy-safe-vercel.md).
  
 ---
  
