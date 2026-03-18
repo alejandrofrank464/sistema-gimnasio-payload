@@ -39,7 +39,7 @@ yarn-error.log*
 next-env.d.ts
 
 .env
-
+test.env
 /media
 
 # Playwright
@@ -50,4 +50,14 @@ node_modules/
 /playwright/.cache/
 
 # DB
-sistema-gimnasio-payload.db
+*.db
+
+# Editor
+.cursor/
+.vscode/settings.json
+.vscode/launch.json
+
+# Docs internas
+plan.md
+AGENTS.md
+00-setup-antes-del-agente.md
