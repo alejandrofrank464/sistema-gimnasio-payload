@@ -13,6 +13,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dumbbell, Eye, EyeOff } from 'lucide-react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Dumbbell02Icon, ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons'
 import { useState } from 'react'
 
 export function LoginForm({
@@ -37,6 +39,9 @@ export function LoginForm({
   submitting?: boolean
 }) {
   const [showPassword, setShowPassword] = useState(false)
+  const [logoFailed, setLogoFailed] = useState(false)
+
+  const canRenderLogo = Boolean(logo) && !logoFailed
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
@@ -79,7 +84,11 @@ export function LoginForm({
                     tabIndex={-1}
                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    {showPassword ? (
+                      <HugeiconsIcon icon={ViewIcon} className="size-4" />
+                    ) : (
+                      <HugeiconsIcon icon={ViewOffSlashIcon} className="size-4" />
+                    )}
                   </button>
                 </div>
               </Field>
@@ -98,17 +107,24 @@ export function LoginForm({
           <div className="bg-muted relative hidden flex-col items-center justify-center gap-6 md:flex">
             {/* Título GYM OS */}
             <div className="flex items-center gap-2">
-              <Dumbbell className="size-6 text-blue-500" />
+              <HugeiconsIcon icon={Dumbbell02Icon} className="size-6 text-blue-500" />
               <span className="text-foreground text-2xl font-bold">GYM OS</span>
             </div>
 
             {/* Avatar circular con imagen */}
             <div className="relative">
-              <img
-                src={logo || '/placeholder.svg'}
-                alt="Logo"
-                className="h-48 w-48 rounded-full object-cover shadow-lg"
-              />
+              {canRenderLogo ? (
+                <img
+                  src={logo}
+                  alt="Logo"
+                  className="h-48 w-48 rounded-full object-cover shadow-lg"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                <div className="bg-primary/10 border-primary/20 flex h-48 w-48 items-center justify-center rounded-full border shadow-lg">
+                  <HugeiconsIcon icon={Dumbbell02Icon} className="text-primary size-20" />
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

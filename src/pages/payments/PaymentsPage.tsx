@@ -208,24 +208,25 @@ export default function PaymentsPage() {
               ))}
             </SelectContent>
           </Select>
-          <ToggleGroup
-            type="single"
-            value={serviceFilter}
-            onValueChange={(value) => setServiceFilter((value as ServiceFilter) || 'all')}
-            variant="outline"
-            size="sm"
-            className="justify-start"
-          >
-            <ToggleGroupItem value="all">Todos los servicios</ToggleGroupItem>
-            {TIPOS_SERVICIO.map((tipo) => (
-              <ToggleGroupItem key={tipo} value={tipo}>
-                {tipo}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
         </div>
       </PageHeader>
-
+      <div className="mb-4 flex flex-wrap gap-2">
+        <ToggleGroup
+          type="single"
+          value={serviceFilter}
+          onValueChange={(value) => setServiceFilter((value as ServiceFilter) || 'all')}
+          variant="outline"
+          size="sm"
+          className="flex-wrap justify-start"
+        >
+          <ToggleGroupItem value="all">Todos</ToggleGroupItem>
+          {TIPOS_SERVICIO.map((tipo) => (
+            <ToggleGroupItem key={tipo} value={tipo}>
+              {tipo}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
       {payments.length === 0 ? (
         <EmptyState
           message={`No hay pagos registrados${filterMonth !== 'all' ? ` en ${MESES[Number(filterMonth)]}` : ''}`}

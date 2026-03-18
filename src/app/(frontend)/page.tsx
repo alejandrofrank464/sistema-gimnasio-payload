@@ -8,37 +8,38 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [logo, setLogo] = useState<string | undefined>()
 
-  // Obtener el logo de los settings de Payload
   useEffect(() => {
-    const fetchLogo = async () => {
+    let isMounted = true
+
+    const loadLogo = async () => {
       try {
-        const response = await fetch('/api/configuraciones?depth=1')
-        if (response.ok) {
-          const data = await response.json()
-          const logoField = data.docs?.[0]?.logo
-          if (logoField?.url) {
-            setLogo(logoField.url)
-          } else if (typeof logoField === 'string') {
-            // Si es un ID (no expandido), intenta obtener desde media
-            const mediaRes = await fetch(`/api/media/${logoField}`)
-            if (mediaRes.ok) {
-              const mediaData = await mediaRes.json()
-              if (mediaData.url) {
-                setLogo(mediaData.url)
-              }
-            }
-          }
+        const response = await fetch('/api/configuraciones/logo')
+        if (!response.ok) return
+
+        const body = (await response.json()) as {
+          data?: {
+            url?: string | null
+          } | null
         }
-      } catch (err) {
-        console.error('Error fetching logo:', err)
+
+        const nextLogoUrl = body?.data?.url || undefined
+        if (isMounted) {
+          setLogoUrl(nextLogoUrl)
+        }
+      } catch {
+        // Keep default visual fallback when logo request fails.
       }
     }
 
-    fetchLogo()
+    void loadLogo()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -61,20 +62,9 @@ export default function LoginPage() {
         return
       }
 
-      const data = (await response.json()) as {
-        token?: string
-        user?: { email?: string; role?: 'admin' | 'staff' }
-      }
+      await response.json().catch(() => null)
 
-      if (data.token) {
-        window.sessionStorage.setItem('gym_token', data.token)
-      }
-
-      if (data.user) {
-        window.sessionStorage.setItem('gym_user', JSON.stringify(data.user))
-      }
-
-      router.push('/clientes')
+      router.push('/home')
       router.refresh()
     } catch {
       setError('No se pudo iniciar sesión')
@@ -92,7 +82,7 @@ export default function LoginPage() {
       <div className="relative grid min-h-screen place-items-center">
         <div className="w-full max-w-sm md:max-w-4xl">
           <LoginForm
-            logo={logo}
+            logo={logoUrl}
             email={email}
             password={password}
             error={error}

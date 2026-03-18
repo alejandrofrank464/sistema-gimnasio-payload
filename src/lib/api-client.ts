@@ -1,24 +1,42 @@
 import { trackRequest } from '@/lib/request-metrics'
 
-const getToken = (): string | null => {
-  if (typeof window === 'undefined') return null
-  return window.sessionStorage.getItem('gym_token')
-}
+const SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+let lastSessionRefreshAt = 0
 
 const authHeaders = (): HeadersInit => {
-  const token = getToken()
-  const headers: HeadersInit = {
+  return {
     'Content-Type': 'application/json',
   }
+}
 
-  if (token) {
-    headers.Authorization = `JWT ${token}`
+const refreshSessionIfNeeded = async () => {
+  if (typeof window === 'undefined') {
+    return
   }
 
-  return headers
+  const now = Date.now()
+  if (now - lastSessionRefreshAt < SESSION_REFRESH_INTERVAL_MS) {
+    return
+  }
+
+  const response = await fetch('/api/users/refresh-token', {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => null)
+
+  if (response?.ok) {
+    lastSessionRefreshAt = now
+    return
+  }
+
+  if (response?.status === 401) {
+    window.location.href = '/'
+  }
 }
 
 export const authFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+  await refreshSessionIfNeeded()
+
   const startedAt = Date.now()
   const method = init?.method ?? 'GET'
   const response = await fetch(url, {
@@ -35,9 +53,14 @@ export const authFetch = async (url: string, init?: RequestInit): Promise<Respon
 }
 
 const trackedFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+  await refreshSessionIfNeeded()
+
   const startedAt = Date.now()
   const method = init?.method ?? 'GET'
-  const response = await fetch(url, init)
+  const response = await fetch(url, {
+    ...init,
+    credentials: 'include',
+  })
   trackRequest(url, method, response.status, Date.now() - startedAt)
   return response
 }
@@ -147,6 +170,7 @@ export const apiClient = {
     },
   },
   settings: {
+    summary: () => trackedFetch('/api/configuraciones/resumen'),
     name: () => trackedFetch('/api/configuraciones/nombre'),
     prices: () => trackedFetch('/api/configuraciones/precios'),
     logo: () => trackedFetch('/api/configuraciones/logo'),
@@ -157,9 +181,6 @@ export const apiClient = {
       return trackedFetch('/api/configuraciones/logo', {
         method: 'POST',
         body: form,
-        headers: {
-          ...(getToken() ? { Authorization: `JWT ${getToken()}` } : {}),
-        },
       })
     },
     upsert: (clave: string, valor: string | number) =>

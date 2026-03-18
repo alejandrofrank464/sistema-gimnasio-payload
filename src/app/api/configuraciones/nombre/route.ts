@@ -1,15 +1,24 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 
+import { isAdminOrStaffUser } from '@/lib/auth-guards'
+
 const DEFAULT_GYM_NAME = 'Gym'
 const NOMBRE_GYM_KEY = 'nombre_gimnasio'
 
-export const GET = async (): Promise<Response> => {
+export const GET = async (request: Request): Promise<Response> => {
   const payload = await getPayload({ config: configPromise })
+  const auth = await payload.auth({ headers: request.headers })
+
+  if (!isAdminOrStaffUser(auth.user)) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
 
   try {
     const result = await payload.find({
       collection: 'configuraciones',
+      user: auth.user,
+      overrideAccess: false,
       where: {
         clave: {
           equals: NOMBRE_GYM_KEY,

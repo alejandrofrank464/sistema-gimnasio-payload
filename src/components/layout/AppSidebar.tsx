@@ -1,6 +1,7 @@
 'use client'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
+  DashboardSquare03Icon,
   UserMultiple02Icon,
   CreditCardAddIcon,
   Calendar02Icon,
@@ -8,7 +9,6 @@ import {
   File02Icon,
   Dumbbell02Icon,
 } from '@hugeicons/core-free-icons'
-import { Users, CreditCard, Calendar, Settings, FileText, Dumbbell } from 'lucide-react'
 import { NavLink } from '@/components/nav-link'
 import { usePathname } from 'next/navigation'
 import {
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/sidebar'
 
 const navItems = [
+  { title: 'Dashboard', url: '/home', icon: DashboardSquare03Icon },
   { title: 'Clientes', url: '/clientes', icon: UserMultiple02Icon },
   { title: 'Pagos', url: '/pagos', icon: CreditCardAddIcon },
   { title: 'Horario', url: '/horario', icon: Calendar02Icon },

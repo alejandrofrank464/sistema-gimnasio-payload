@@ -5,7 +5,7 @@ import { Providers } from '@/providers'
 
 export const metadata = {
   description: 'Dashboard funcional de gimnasio sobre Payload CMS.',
-  title: 'Sistema Gimnasio',
+  title: 'GYM OS',
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {

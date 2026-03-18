@@ -1,6 +1,8 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 
+import { isAdminOrStaffUser } from '@/lib/auth-guards'
+
 type UpsertBody = {
   clave?: string
   valor?: string | number | boolean | null
@@ -8,7 +10,12 @@ type UpsertBody = {
 
 export const POST = async (request: Request): Promise<Response> => {
   const payload = await getPayload({ config: configPromise })
+  const auth = await payload.auth({ headers: request.headers })
   const body = (await request.json()) as UpsertBody
+
+  if (!isAdminOrStaffUser(auth.user)) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
 
   if (!body?.clave || body.valor === undefined) {
     return Response.json({ error: 'Se requieren los campos clave y valor.' }, { status: 400 })
@@ -24,6 +31,8 @@ export const POST = async (request: Request): Promise<Response> => {
 
   const existing = await payload.find({
     collection: 'configuraciones',
+    user: auth.user,
+    overrideAccess: false,
     where: {
       clave: {
         equals: clave,
@@ -37,6 +46,8 @@ export const POST = async (request: Request): Promise<Response> => {
     const updated = await payload.update({
       collection: 'configuraciones',
       id: existing.docs[0].id,
+      user: auth.user,
+      overrideAccess: false,
       data: {
         valor,
       },
@@ -47,6 +58,8 @@ export const POST = async (request: Request): Promise<Response> => {
 
   const created = await payload.create({
     collection: 'configuraciones',
+    user: auth.user,
+    overrideAccess: false,
     data: {
       clave,
       valor,

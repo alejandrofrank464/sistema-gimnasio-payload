@@ -2,6 +2,9 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import sharp from 'sharp'
 
+import type { User } from '@/payload-types'
+import { isAdminOrStaffUser } from '@/lib/auth-guards'
+
 const LOGO_KEY = 'logo'
 const MAX_LOGO_SIZE_BYTES = 400 * 1024
 const ALLOWED_LOGO_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
@@ -29,9 +32,14 @@ const parseMediaId = (value: unknown): number | null => {
   return null
 }
 
-const findExistingLogoMediaId = async (payload: Awaited<ReturnType<typeof getPayload>>) => {
+const findExistingLogoMediaId = async (
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  user: Pick<User, 'id' | 'role' | 'email'>,
+) => {
   const existing = await payload.find({
     collection: 'configuraciones',
+    user,
+    overrideAccess: false,
     where: {
       clave: {
         equals: LOGO_KEY,
@@ -77,10 +85,13 @@ const optimizeIfPossible = async (logoFile: File) => {
 
 const upsertLogoConfig = async (
   payload: Awaited<ReturnType<typeof getPayload>>,
+  user: Pick<User, 'id' | 'role' | 'email'>,
   mediaId: number,
 ) => {
   const existing = await payload.find({
     collection: 'configuraciones',
+    user,
+    overrideAccess: false,
     where: {
       clave: {
         equals: LOGO_KEY,
@@ -94,6 +105,8 @@ const upsertLogoConfig = async (
     return payload.update({
       collection: 'configuraciones',
       id: existing.docs[0].id,
+      user,
+      overrideAccess: false,
       data: {
         valor: String(mediaId),
         logo: mediaId,
@@ -103,6 +116,8 @@ const upsertLogoConfig = async (
 
   return payload.create({
     collection: 'configuraciones',
+    user,
+    overrideAccess: false,
     data: {
       clave: LOGO_KEY,
       valor: String(mediaId),
@@ -111,11 +126,15 @@ const upsertLogoConfig = async (
   })
 }
 
-export const GET = async (): Promise<Response> => {
+export const GET = async (request: Request): Promise<Response> => {
   const payload = await getPayload({ config: configPromise })
+  const auth = await payload.auth({ headers: request.headers })
+  const requestUser = isAdminOrStaffUser(auth.user) ? auth.user : undefined
 
   const config = await payload.find({
     collection: 'configuraciones',
+    ...(requestUser ? { user: requestUser } : {}),
+    overrideAccess: false,
     where: {
       clave: {
         equals: LOGO_KEY,
@@ -146,6 +165,8 @@ export const GET = async (): Promise<Response> => {
       collection: 'media',
       id: mediaId,
       depth: 0,
+      ...(requestUser ? { user: requestUser } : {}),
+      overrideAccess: false,
     })
   } catch (error) {
     if (!isNotFoundError(error)) {
@@ -153,16 +174,20 @@ export const GET = async (): Promise<Response> => {
     }
 
     // The media file was removed manually from Payload. Clean stale logo reference.
-    await payload
-      .update({
-        collection: 'configuraciones',
-        id: config.docs[0].id,
-        data: {
-          valor: '',
-          logo: null,
-        },
-      })
-      .catch(() => null)
+    if (requestUser) {
+      await payload
+        .update({
+          collection: 'configuraciones',
+          id: config.docs[0].id,
+          user: requestUser,
+          overrideAccess: false,
+          data: {
+            valor: '',
+            logo: null,
+          },
+        })
+        .catch(() => null)
+    }
 
     return Response.json({ data: null })
   }
@@ -185,8 +210,13 @@ export const GET = async (): Promise<Response> => {
 
 export const POST = async (request: Request): Promise<Response> => {
   const payload = await getPayload({ config: configPromise })
+  const auth = await payload.auth({ headers: request.headers })
   const form = await request.formData()
   const logoFile = form.get('logo')
+
+  if (!isAdminOrStaffUser(auth.user)) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 })
+  }
 
   if (!(logoFile instanceof File)) {
     return Response.json({ error: 'No se proporciono archivo.' }, { status: 400 })
@@ -199,7 +229,7 @@ export const POST = async (request: Request): Promise<Response> => {
     )
   }
 
-  const previousMediaId = await findExistingLogoMediaId(payload)
+  const previousMediaId = await findExistingLogoMediaId(payload, auth.user)
 
   const optimized = await optimizeIfPossible(logoFile)
   if (optimized.size > MAX_LOGO_SIZE_BYTES) {
@@ -211,6 +241,8 @@ export const POST = async (request: Request): Promise<Response> => {
 
   const media = await payload.create({
     collection: 'media',
+    user: auth.user,
+    overrideAccess: false,
     data: {
       alt: 'Logo del gimnasio',
     },
@@ -222,13 +254,15 @@ export const POST = async (request: Request): Promise<Response> => {
     },
   })
 
-  await upsertLogoConfig(payload, media.id)
+  await upsertLogoConfig(payload, auth.user, media.id)
 
   if (previousMediaId && previousMediaId !== media.id) {
     await payload
       .delete({
         collection: 'media',
         id: previousMediaId,
+        user: auth.user,
+        overrideAccess: false,
       })
       .catch(() => null)
   }

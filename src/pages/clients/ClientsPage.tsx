@@ -154,7 +154,7 @@ export default function ClientsPage() {
           onValueChange={(value) => setStatusFilter((value as StatusFilter) || 'all')}
           variant="outline"
           size="sm"
-          className="justify-start"
+          className="flex-wrap justify-start"
         >
           <ToggleGroupItem value="all">Todos</ToggleGroupItem>
           <ToggleGroupItem value="active">Activos</ToggleGroupItem>
@@ -167,9 +167,9 @@ export default function ClientsPage() {
           onValueChange={(value) => setServiceFilter((value as ServiceFilter) || 'all')}
           variant="outline"
           size="sm"
-          className="justify-start"
+          className="flex-wrap justify-start"
         >
-          <ToggleGroupItem value="all">Todos los servicios</ToggleGroupItem>
+          <ToggleGroupItem value="all">Todos</ToggleGroupItem>
           {TIPOS_SERVICIO.map((tipo) => (
             <ToggleGroupItem key={tipo} value={tipo}>
               {tipo}

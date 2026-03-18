@@ -5,7 +5,17 @@ export const Users: CollectionConfig = {
   admin: {
     useAsTitle: 'email',
   },
-  auth: true,
+  auth: {
+    cookies: {
+      sameSite: 'Lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+    maxLoginAttempts: 5,
+    lockTime: 10 * 60 * 1000,
+    removeTokenFromResponses: true,
+    tokenExpiration: 30 * 60,
+    useSessions: true,
+  },
   fields: [
     {
       name: 'role',
