@@ -22,6 +22,7 @@ const ROLE_PROTECTED_API_PREFIXES = [
 
 const PUBLIC_API_PATHS = new Set([
   '/api/users/login',
+  '/api/users/first-register',
   '/api/users/forgot-password',
   '/api/users/reset-password',
   '/api/configuraciones/logo',
