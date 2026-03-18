@@ -1,6 +1,8 @@
 import type { Access, CollectionConfig } from 'payload'
 
 const isAdmin: Access = ({ req }) => req.user?.role === 'admin'
+const canAccessAdminPanel = ({ req }: { req: { user?: { role?: string } | null } }) =>
+  req.user?.role === 'admin'
 
 const isAdminOrSelf: Access = ({ req }) => {
   if (!req.user) return false
@@ -30,6 +32,7 @@ const canCreateUser: Access = async ({ req }) => {
 export const Users: CollectionConfig = {
   slug: 'users',
   access: {
+    admin: canAccessAdminPanel,
     create: canCreateUser,
     delete: isAdmin,
     read: isAdminOrSelf,

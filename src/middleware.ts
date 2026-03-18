@@ -77,23 +77,30 @@ export function middleware(request: NextRequest) {
   const role = token ? getRoleFromToken(token) : null
   const hasAllowedRole = role ? ALLOWED_ROLES.has(role) : false
 
+  // El panel de Payload y sus subrutas se gestionan con el auth nativo de Payload.
+  if (isPayloadAdminPath(pathname)) {
+    return NextResponse.next()
+  }
+
   if (pathname === ROOT_LOGIN_PATH && isAuthenticated) {
     const nextUrl = request.nextUrl.clone()
     nextUrl.pathname = DEFAULT_AUTH_REDIRECT_PATH
     return NextResponse.redirect(nextUrl)
   }
 
-  if (!isAuthenticated && !isApiPath && !isPublicPath(pathname)) {
-    if (isPayloadAdminPath(pathname)) {
-      return NextResponse.next()
-    }
-
+  if (!isAuthenticated && !isApiPath && isRoleProtectedPagePath(pathname)) {
     const nextUrl = request.nextUrl.clone()
     nextUrl.pathname = ROOT_LOGIN_PATH
     return NextResponse.redirect(nextUrl)
   }
 
-  if (!isAuthenticated && isApiPath && !isPublicApiPath(pathname)) {
+  // Solo proteger APIs custom del frontend; las rutas API de Payload se dejan pasar.
+  if (
+    !isAuthenticated &&
+    isApiPath &&
+    isRoleProtectedApiPath(pathname) &&
+    !isPublicApiPath(pathname)
+  ) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 

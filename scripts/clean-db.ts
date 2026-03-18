@@ -11,6 +11,16 @@ type CleanResult = {
   deleted: number
 }
 
+const DEMO_DOMAIN = 'demo.gym.local'
+const DEMO_CONFIG_KEYS = [
+  'nombre_gimnasio',
+  'precio_normal',
+  'precio_vip',
+  'precio_zumba_o_box',
+  'precio_zumba_y_box',
+  'precio_vip_zumba_y_box',
+]
+
 const CLEANABLE_COLLECTIONS = [
   'pagos',
   'logs',
@@ -24,10 +34,7 @@ type CleanableCollection = (typeof CLEANABLE_COLLECTIONS)[number]
 
 const whereAll = { id: { exists: true } }
 
-async function cleanCollection(
-  payloadInstance: Awaited<ReturnType<typeof getPayload>>,
-  collection: CleanableCollection,
-) {
+async function cleanCollection(payloadInstance: PayloadInstance, collection: CleanableCollection) {
   const existing = await payloadInstance.find({
     collection,
     where: whereAll,
@@ -64,17 +71,164 @@ const closePayload = async (payloadInstance: PayloadInstance | null) => {
   }
 }
 
+const cleanDemoOnly = async (payloadInstance: PayloadInstance): Promise<CleanResult[]> => {
+  const results: CleanResult[] = []
+
+  const demoClients = await payloadInstance.find({
+    collection: 'clientes',
+    where: {
+      email: {
+        like: `@${DEMO_DOMAIN}`,
+      },
+    },
+    depth: 0,
+    limit: 10000,
+  })
+
+  const demoClientIds = demoClients.docs.map((doc) => doc.id)
+
+  if (demoClientIds.length > 0) {
+    const pagos = await payloadInstance.find({
+      collection: 'pagos',
+      where: {
+        cliente: {
+          in: demoClientIds,
+        },
+      },
+      depth: 0,
+      limit: 1,
+    })
+
+    if (pagos.totalDocs > 0) {
+      await payloadInstance.delete({
+        collection: 'pagos',
+        where: {
+          cliente: {
+            in: demoClientIds,
+          },
+        },
+        context: { skipLog: true },
+      })
+    }
+
+    results.push({ collection: 'pagos', deleted: pagos.totalDocs })
+  } else {
+    results.push({ collection: 'pagos', deleted: 0 })
+  }
+
+  if (demoClients.totalDocs > 0) {
+    await payloadInstance.delete({
+      collection: 'clientes',
+      where: {
+        email: {
+          like: `@${DEMO_DOMAIN}`,
+        },
+      },
+      context: { skipLog: true },
+    })
+  }
+  results.push({ collection: 'clientes', deleted: demoClients.totalDocs })
+
+  const demoUsers = await payloadInstance.find({
+    collection: 'users',
+    where: {
+      email: {
+        like: `@${DEMO_DOMAIN}`,
+      },
+    },
+    depth: 0,
+    limit: 1,
+  })
+
+  if (demoUsers.totalDocs > 0) {
+    await payloadInstance.delete({
+      collection: 'users',
+      where: {
+        email: {
+          like: `@${DEMO_DOMAIN}`,
+        },
+      },
+    })
+  }
+  results.push({ collection: 'users', deleted: demoUsers.totalDocs })
+
+  const demoConfig = await payloadInstance.find({
+    collection: 'configuraciones',
+    where: {
+      clave: {
+        in: DEMO_CONFIG_KEYS,
+      },
+    },
+    depth: 0,
+    pagination: false,
+    limit: 100,
+  })
+
+  if (demoConfig.totalDocs > 0) {
+    await payloadInstance.delete({
+      collection: 'configuraciones',
+      where: {
+        clave: {
+          in: DEMO_CONFIG_KEYS,
+        },
+      },
+      context: { skipLog: true },
+    })
+  }
+  results.push({ collection: 'configuraciones', deleted: demoConfig.totalDocs })
+
+  const demoLogs = await payloadInstance.find({
+    collection: 'logs',
+    where: {
+      usuario: {
+        contains: `@${DEMO_DOMAIN}`,
+      },
+    },
+    depth: 0,
+    limit: 1,
+  })
+
+  if (demoLogs.totalDocs > 0) {
+    await payloadInstance.delete({
+      collection: 'logs',
+      where: {
+        usuario: {
+          contains: `@${DEMO_DOMAIN}`,
+        },
+      },
+      context: { skipLog: true },
+    })
+  }
+  results.push({ collection: 'logs', deleted: demoLogs.totalDocs })
+
+  return results
+}
+
 async function main() {
   let payloadInstance: PayloadInstance | null = null
 
   try {
     const includeUsers = process.argv.includes('--include-users')
+    const demoOnly = process.argv.includes('--demo-only')
+
     payloadInstance = await getPayload({ config })
+
+    console.log('🧹 Limpiando base de datos...')
+
+    if (demoOnly) {
+      console.log('🎯 Modo demo-only activado')
+      const results = await cleanDemoOnly(payloadInstance)
+      for (const result of results) {
+        console.log(`  ✓ ${result.collection}: ${result.deleted} eliminados`)
+      }
+      const total = results.reduce((sum, item) => sum + item.deleted, 0)
+      console.log(`\n✅ Limpieza demo completada. Registros eliminados: ${total}`)
+      return
+    }
 
     const order: CleanableCollection[] = ['pagos', 'logs', 'clientes', 'configuraciones', 'media']
     if (includeUsers) order.push('users')
 
-    console.log('🧹 Limpiando base de datos...')
     if (includeUsers) {
       console.log('⚠️ Incluyendo usuarios (--include-users)')
     }

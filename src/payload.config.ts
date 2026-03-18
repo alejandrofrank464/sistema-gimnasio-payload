@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob'
@@ -15,8 +17,10 @@ import { Pagos } from './collections/Pagos'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const isProduction = process.env.NODE_ENV === 'production'
 
 const postgresURL =
+  (!isProduction ? process.env.POSTGRES_URL_DEV : undefined) ||
   process.env.POSTGRES_URL ||
   process.env.DATABASE_URL ||
   'postgres://postgres:postgres@127.0.0.1:5432/postgres'
