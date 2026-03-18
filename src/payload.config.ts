@@ -1,5 +1,4 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob'
 import path from 'path'
@@ -17,9 +16,10 @@ import { Pagos } from './collections/Pagos'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-const postgresURL = process.env.POSTGRES_URL || process.env.DATABASE_URL || ''
-const isPostgresURL =
-  postgresURL.startsWith('postgres://') || postgresURL.startsWith('postgresql://')
+const postgresURL =
+  process.env.POSTGRES_URL ||
+  process.env.DATABASE_URL ||
+  'postgres://postgres:postgres@127.0.0.1:5432/postgres'
 
 export default buildConfig({
   admin: {
@@ -34,17 +34,11 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: isPostgresURL
-    ? postgresAdapter({
-        pool: {
-          connectionString: postgresURL,
-        },
-      })
-    : sqliteAdapter({
-        client: {
-          url: process.env.DATABASE_URL || 'file:./sistema-gimnasio-payload.db',
-        },
-      }),
+  db: postgresAdapter({
+    pool: {
+      connectionString: postgresURL,
+    },
+  }),
   sharp,
   plugins: [
     vercelBlobStorage({
