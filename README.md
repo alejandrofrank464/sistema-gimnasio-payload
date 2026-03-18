@@ -86,18 +86,6 @@ Optional scripts:
 - Vercel Blob storage for media
 - Vitest + Playwright
 
-## Architecture
-
-```mermaid
-flowchart LR
-  A[Users Admin/Staff] --> B[Next.js App Router UI]
-  B --> C[Payload Collections]
-  C --> D[Business Hooks]
-  D --> E[(SQLite or PostgreSQL)]
-  C --> F[Custom Config API Endpoints]
-  C --> G[Vercel Blob Media]
-```
-
 ## Notes
 
 - Core envs: `PAYLOAD_SECRET`, `DATABASE_URL`, `POSTGRES_URL`, `BLOB_READ_WRITE_TOKEN`.
