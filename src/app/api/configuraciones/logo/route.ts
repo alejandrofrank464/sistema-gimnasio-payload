@@ -13,7 +13,20 @@ const isNotFoundError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false
 
   const maybeStatus = (error as { status?: unknown }).status
-  return maybeStatus === 404
+  if (maybeStatus === 404) return true
+
+  const maybeCode = (error as { code?: unknown }).code
+  if (maybeCode === 'ENOENT' || maybeCode === 'NotFound') return true
+
+  const maybeMessage = (error as { message?: unknown }).message
+  if (typeof maybeMessage === 'string') {
+    const normalized = maybeMessage.toLowerCase()
+    if (normalized.includes('not found') || normalized.includes('no such')) {
+      return true
+    }
+  }
+
+  return false
 }
 
 const parseMediaId = (value: unknown): number | null => {
@@ -127,85 +140,91 @@ const upsertLogoConfig = async (
 }
 
 export const GET = async (request: Request): Promise<Response> => {
-  const payload = await getPayload({ config: configPromise })
-  const auth = await payload.auth({ headers: request.headers })
-  const requestUser = isAdminOrStaffUser(auth.user) ? auth.user : undefined
-
-  const config = await payload.find({
-    collection: 'configuraciones',
-    ...(requestUser ? { user: requestUser } : {}),
-    overrideAccess: false,
-    where: {
-      clave: {
-        equals: LOGO_KEY,
-      },
-    },
-    limit: 1,
-    depth: 0,
-  })
-
-  if (!config.totalDocs) {
-    return Response.json({ data: null })
-  }
-
-  const mediaId = parseMediaId(config.docs[0].logo) ?? parseMediaId(config.docs[0].valor)
-  if (!mediaId) {
-    return Response.json({ data: null })
-  }
-
-  let media: {
-    id: number
-    url?: string | null
-    thumbnailURL?: string | null
-    filename?: string | null
-  } | null = null
-
   try {
-    media = await payload.findByID({
-      collection: 'media',
-      id: mediaId,
-      depth: 0,
+    const payload = await getPayload({ config: configPromise })
+    const auth = await payload.auth({ headers: request.headers })
+    const requestUser = isAdminOrStaffUser(auth.user) ? auth.user : undefined
+
+    const config = await payload.find({
+      collection: 'configuraciones',
       ...(requestUser ? { user: requestUser } : {}),
       overrideAccess: false,
+      where: {
+        clave: {
+          equals: LOGO_KEY,
+        },
+      },
+      limit: 1,
+      depth: 0,
     })
-  } catch (error) {
-    if (!isNotFoundError(error)) {
-      throw error
+
+    if (!config.totalDocs) {
+      return Response.json({ data: null })
     }
 
-    // The media file was removed manually from Payload. Clean stale logo reference.
-    if (requestUser) {
-      await payload
-        .update({
-          collection: 'configuraciones',
-          id: config.docs[0].id,
-          user: requestUser,
-          overrideAccess: false,
-          data: {
-            valor: '',
-            logo: null,
-          },
-        })
-        .catch(() => null)
+    const mediaId = parseMediaId(config.docs[0].logo) ?? parseMediaId(config.docs[0].valor)
+    if (!mediaId) {
+      return Response.json({ data: null })
     }
 
+    let media: {
+      id: number
+      url?: string | null
+      thumbnailURL?: string | null
+      filename?: string | null
+    } | null = null
+
+    try {
+      media = await payload.findByID({
+        collection: 'media',
+        id: mediaId,
+        depth: 0,
+        ...(requestUser ? { user: requestUser } : {}),
+        overrideAccess: false,
+      })
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        // For login/public usage prefer graceful fallback over failing the request.
+        return Response.json({ data: null })
+      }
+
+      // The media reference is stale or file is missing in storage. Return graceful fallback.
+      if (requestUser) {
+        await payload
+          .update({
+            collection: 'configuraciones',
+            id: config.docs[0].id,
+            user: requestUser,
+            overrideAccess: false,
+            data: {
+              valor: '',
+              logo: null,
+            },
+          })
+          .catch(() => null)
+      }
+
+      return Response.json({ data: null })
+    }
+
+    if (!media) {
+      return Response.json({ data: null })
+    }
+
+    const url = media.url || media.thumbnailURL || null
+    if (!url) return Response.json({ data: null })
+
+    return Response.json({
+      data: {
+        id: media.id,
+        url,
+        filename: media.filename,
+      },
+    })
+  } catch {
+    // Any unexpected error should not break login visuals.
     return Response.json({ data: null })
   }
-
-  if (!media) {
-    return Response.json({ data: null })
-  }
-
-  const url = media.url || media.thumbnailURL || null
-  if (!url) return Response.json({ data: null })
-
-  return Response.json({
-    data: {
-      id: media.id,
-      url,
-      filename: media.filename,
-    },
-  })
 }
 
 export const POST = async (request: Request): Promise<Response> => {
