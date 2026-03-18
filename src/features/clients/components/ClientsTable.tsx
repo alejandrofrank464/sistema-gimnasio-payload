@@ -1,4 +1,4 @@
-import { Client, Payment, MESES } from '@/types'
+import { Client, Payment } from '@/types'
 import {
   Table,
   TableBody,

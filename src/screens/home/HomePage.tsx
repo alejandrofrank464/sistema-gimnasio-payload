@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import {
   CreditCardIcon,
   ReceiptDollarIcon,
@@ -8,13 +9,26 @@ import {
   UserGroupIcon,
 } from '@hugeicons/core-free-icons'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { RecentLogs, RevenueChart, ServiceDistributionChart, StatCard } from '@/features/dashboard'
+import { RecentLogs, StatCard } from '@/features/dashboard'
 import { useClientsQuery } from '@/features/clients/hooks/use-clients-query'
 import { useLogsListQuery } from '@/features/logs/hooks/use-logs-query'
 import { usePaymentsQueryFiltered } from '@/features/payments/hooks/use-payments-query'
 import { useData } from '@/lib/data-context'
 
 const PREVIOUS_PERIOD_LABEL = 'vs mes anterior'
+
+const RevenueChart = dynamic(
+  () => import('@/features/dashboard/components/RevenueChart').then((mod) => mod.RevenueChart),
+  { ssr: false },
+)
+
+const ServiceDistributionChart = dynamic(
+  () =>
+    import('@/features/dashboard/components/ServiceDistributionChart').then(
+      (mod) => mod.ServiceDistributionChart,
+    ),
+  { ssr: false },
+)
 
 export default function HomePage() {
   const { settings } = useData()

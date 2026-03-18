@@ -1,4 +1,4 @@
-import SchedulePage from '@/pages/schedule/SchedulePage'
+import SchedulePage from '@/screens/schedule/SchedulePage'
 
 export default function HorarioRoute() {
   return <SchedulePage />

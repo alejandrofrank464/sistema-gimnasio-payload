@@ -1,4 +1,4 @@
-import LogsPage from '@/pages/logs/LogsPage'
+import LogsPage from '@/screens/logs/LogsPage'
 
 export default function LogsRoute() {
   return <LogsPage />

@@ -1,4 +1,5 @@
 import { useForm } from 'react-hook-form'
+import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Client, MetodoPago, TIPOS_SERVICIO, TURNOS, TipoServicio, Turno } from '@/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -46,7 +47,7 @@ export function ClientForm({
     watch,
     formState: { errors },
   } = useForm<ClientFormData>({
-    resolver: zodResolver(clientFormSchema as any) as any,
+    resolver: zodResolver(clientFormSchema) as Resolver<ClientFormData>,
     defaultValues: {
       nombre: '',
       apellido: '',

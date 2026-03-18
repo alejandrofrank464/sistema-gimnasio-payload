@@ -3,19 +3,13 @@
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Dumbbell, Eye, EyeOff } from 'lucide-react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Dumbbell02Icon, ViewIcon, ViewOffSlashIcon } from '@hugeicons/core-free-icons'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export function LoginForm({
   className,
@@ -41,7 +35,7 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false)
   const [logoFailed, setLogoFailed] = useState(false)
 
-  const canRenderLogo = Boolean(logo) && !logoFailed
+  const logoSrc = logo && !logoFailed ? logo : null
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
@@ -113,10 +107,12 @@ export function LoginForm({
 
             {/* Avatar circular con imagen */}
             <div className="relative">
-              {canRenderLogo ? (
-                <img
-                  src={logo}
+              {logoSrc ? (
+                <Image
+                  src={logoSrc}
                   alt="Logo"
+                  width={192}
+                  height={192}
                   className="h-48 w-48 rounded-full object-cover shadow-lg"
                   onError={() => setLogoFailed(true)}
                 />

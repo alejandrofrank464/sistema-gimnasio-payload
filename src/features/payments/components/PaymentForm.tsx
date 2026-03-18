@@ -1,4 +1,5 @@
 import { useForm } from 'react-hook-form'
+import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Client,
@@ -45,7 +46,12 @@ export function PaymentForm({
   onCreate,
   onUpdate,
 }: PaymentFormProps) {
-  const now = new Date()
+  const getCurrentMonthYear = () => {
+    const now = new Date()
+    return { mes: now.getMonth(), anio: now.getFullYear() }
+  }
+
+  const { mes: currentMes, anio: currentAnio } = getCurrentMonthYear()
 
   const {
     register,
@@ -55,12 +61,12 @@ export function PaymentForm({
     watch,
     formState: { errors },
   } = useForm<PaymentFormData>({
-    resolver: zodResolver(paymentSchema as any) as any,
+    resolver: zodResolver(paymentSchema) as Resolver<PaymentFormData>,
     defaultValues: {
       clienteId: '',
       monto: 500,
-      mes: now.getMonth(),
-      anio: now.getFullYear(),
+      mes: currentMes,
+      anio: currentAnio,
       metodoPago: 'Efectivo',
       tipoServicio: 'Normal',
       turno: '08:00',
@@ -89,11 +95,12 @@ export function PaymentForm({
         turno: payment.turno,
       })
     } else {
+      const { mes, anio } = getCurrentMonthYear()
       reset({
         clienteId: '',
         monto: 500,
-        mes: now.getMonth(),
-        anio: now.getFullYear(),
+        mes,
+        anio,
         metodoPago: 'Efectivo',
         tipoServicio: 'Normal',
         turno: '08:00',
