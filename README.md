@@ -57,7 +57,7 @@ flowchart LR
   A[Users Admin/Staff] --> B[Next.js App Router UI]
   B --> C[Payload Collections]
   C --> D[Business Hooks]
-  D --> E[(SQLite or PostgreSQL)]
+  D --> E[(PostgreSQL)]
   C --> F[Custom Config API Endpoints]
   C --> G[Vercel Blob Media]
 ```
