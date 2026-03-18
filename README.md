@@ -67,7 +67,7 @@ flowchart LR
 - **End-to-end TypeScript** across backend and frontend with generated types from Payload's schema.
 - **Headless CMS as backend** — Payload CMS handles auth, collections, and REST endpoints, removing boilerplate while keeping full control over business logic.
 - **Explicit business rules** — Anti-duplicate payment validation and automatic payment generation are enforced at the collection hook level, not in the UI.
-- **Migration-ready architecture** — SQLite locally, PostgreSQL in production. Switching requires only an env var change.
+- **PostgreSQL-only architecture** — SQLite was intentionally removed to ensure full compatibility with serverless environments (Vercel). A local PostgreSQL instance or a free Neon database is required even for development.
 - **Engineering quality practices** — Generated types, integration tests (Vitest), E2E tests (Playwright), and seed scripts for reproducible demo environments.
  
 ---
@@ -81,8 +81,7 @@ flowchart LR
 | Language | TypeScript 5.7 |
 | Data fetching | TanStack Query v5 |
 | Styling | Tailwind CSS + reusable UI components |
-| Database (local) | SQLite |
-| Database (production) | PostgreSQL (Neon) |
+| Database | PostgreSQL (Neon recommended) |
 | Media storage | Vercel Blob |
 | Testing | Vitest (integration) + Playwright (E2E) |
 | Deployment target | Vercel |
@@ -103,11 +102,11 @@ pnpm dev
 | Variable | Description |
 |---|---|
 | `PAYLOAD_SECRET` | Secret key for Payload CMS session signing |
-| `DATABASE_URL` | SQLite path for local development (e.g. `file:./gym.db`) |
-| `POSTGRES_URL` | PostgreSQL connection string for production |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for media uploads |
+| `POSTGRES_URL` | PostgreSQL connection string (primary). Falls back to `DATABASE_URL` if not set |
+| `DATABASE_URL` | Alternative PostgreSQL connection string (optional fallback) |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for media uploads (optional — disables media storage if not set) |
  
-> The app runs with SQLite by default. Set `POSTGRES_URL` and switch the db adapter for production deployment.
+> The app requires a PostgreSQL database. For local development, you can use a local PostgreSQL instance or a free Neon database. SQLite is **not supported** — the adapter was removed to ensure compatibility with serverless environments like Vercel.
 
 ### Optional Scripts
  
@@ -136,12 +135,15 @@ pnpm test:e2e           # Run E2E tests (Playwright)
 ---
  
 ## Deployment
- 
-Planned production stack: **Vercel + Neon (PostgreSQL) + Vercel Blob**.
- 
-1. Set `POSTGRES_URL` and switch the database adapter in `payload.config.ts`.
-2. Configure `BLOB_READ_WRITE_TOKEN` for media uploads.
-3. Deploy to Vercel — the app is fully compatible with serverless environments.
+
+Production stack: **Vercel + Neon (PostgreSQL) + Vercel Blob**.
+
+1. Create a PostgreSQL database on [Neon](https://neon.tech) or any PostgreSQL provider.
+2. Set `POSTGRES_URL` in your Vercel environment variables.
+3. Configure `BLOB_READ_WRITE_TOKEN` for media uploads (optional — media storage is disabled if the token is absent).
+4. Deploy to Vercel — the app is fully compatible with serverless environments.
+
+> For local development, point `POSTGRES_URL` to a local PostgreSQL instance or a Neon development branch.
  
 ---
  
