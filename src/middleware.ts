@@ -19,33 +19,24 @@ const ROLE_PROTECTED_API_PREFIXES = [
   '/api/logs',
   '/api/configuraciones',
 ]
-
-const PUBLIC_API_PATHS = new Set([
-  '/api/users/login',
-  '/api/users/first-register',
-  '/api/users/forgot-password',
-  '/api/users/reset-password',
-  '/api/configuraciones/logo',
-])
-
-const isPublicPath = (pathname: string): boolean => {
-  return pathname === ROOT_LOGIN_PATH
-}
+const ROLE_PROTECTED_API_PATHS = ['/api/users/change-password']
+const PUBLIC_SETTINGS_LOGO_API_PATH = '/api/configuraciones/logo'
 
 const isPayloadAdminPath = (pathname: string): boolean => {
   return pathname === '/admin' || pathname.startsWith('/admin/')
 }
 
-const isPublicApiPath = (pathname: string): boolean => {
-  return PUBLIC_API_PATHS.has(pathname)
-}
+const isPublicApiPath = (pathname: string): boolean => pathname === PUBLIC_SETTINGS_LOGO_API_PATH
 
 const isRoleProtectedPagePath = (pathname: string): boolean => {
   return ROLE_PROTECTED_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
 const isRoleProtectedApiPath = (pathname: string): boolean => {
-  return ROLE_PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  return (
+    ROLE_PROTECTED_API_PATHS.includes(pathname) ||
+    ROLE_PROTECTED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  )
 }
 
 const decodeJwtPayload = (token: string): Record<string, unknown> | null => {

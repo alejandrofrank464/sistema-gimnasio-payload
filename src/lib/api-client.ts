@@ -66,6 +66,18 @@ const trackedFetch = async (url: string, init?: RequestInit): Promise<Response> 
 }
 
 export const apiClient = {
+  users: {
+    changePassword: (body: {
+      currentPassword: string
+      newPassword: string
+      confirmNewPassword: string
+    }) =>
+      trackedFetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+  },
   clientes: {
     list: (params?: { page?: number; limit?: number; search?: string }) => {
       const searchParams = new URLSearchParams({

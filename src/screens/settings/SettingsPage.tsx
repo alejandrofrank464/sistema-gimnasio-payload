@@ -5,6 +5,7 @@ import { useData } from '@/lib/data-context'
 import { apiClient } from '@/lib/api-client'
 import { PageHeader } from '@/components/shared/PageHeader'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,7 @@ import { toast } from 'sonner'
 import { Save, Upload } from 'lucide-react'
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { settings, updateSettings } = useData()
   const [nombre, setNombre] = useState(settings.nombreGimnasio)
   const [priceInputs, setPriceInputs] = useState<string[]>(
@@ -20,6 +22,10 @@ export default function SettingsPage() {
   )
   const [logoPreview, setLogoPreview] = useState(settings.logoUrl)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
     setNombre(settings.nombreGimnasio)
@@ -75,6 +81,55 @@ export default function SettingsPage() {
     } finally {
       setIsUploadingLogo(false)
       e.target.value = ''
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      toast.error('Completa todos los campos de contraseña')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      toast.error('La nueva contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast.error('La confirmación de contraseña no coincide')
+      return
+    }
+
+    if (currentPassword === newPassword) {
+      toast.error('La nueva contraseña debe ser distinta de la actual')
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      const response = await apiClient.users.changePassword({
+        currentPassword,
+        newPassword,
+        confirmNewPassword,
+      })
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || 'No se pudo actualizar la contraseña')
+      }
+
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+      toast.success('Contraseña actualizada. Debes iniciar sesión nuevamente.')
+
+      router.replace('/')
+      router.refresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar contraseña')
+    } finally {
+      setIsChangingPassword(false)
     }
   }
 
@@ -149,6 +204,59 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-6 grid max-w-4xl grid-cols-1 gap-6">
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Seguridad</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <Label className="text-xs">Contraseña actual</Label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="bg-background mt-1"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Nueva contraseña</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="bg-background mt-1"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Confirmar nueva contraseña</Label>
+                <Input
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="bg-background mt-1"
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={handleChangePassword}
+                disabled={isChangingPassword}
+              >
+                {isChangingPassword ? 'Actualizando...' : 'Actualizar Contraseña'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
