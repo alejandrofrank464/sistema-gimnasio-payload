@@ -10,6 +10,8 @@ import { ArrowLeft, Phone, Mail, Calendar, FileText } from 'lucide-react'
 import { useClientsQuery } from '@/features/clients/hooks/use-clients-query'
 import { useClientPaymentsInfiniteQuery } from '@/features/payments/hooks/use-payments-query'
 
+export const dynamic = 'force-dynamic'
+
 export default function ClientDetailPage() {
   const params = useParams<{ id: string }>()
   const rawId = params?.id
