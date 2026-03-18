@@ -10,7 +10,18 @@
 
 Business-oriented fullstack app designed to run a gym operation end-to-end: clients, payments, settings, and operational logs. Built with a backend-first mindset, explicit business rules, and a clean architecture ready for production.
 
-> 🚀 **[Live Demo](#)** · 📖 **[Versión en Español](README.es.md)**
+> 🚀 **[Live Demo](https://liftdesk-demo.vercel.app)** · 📖 **[Versión en Español](README.es.md)**
+
+## Demo Access
+
+Two roles are available to explore the app:
+
+| Role    | Email                  | Password   | Access                                    |
+| ------- | ---------------------- | ---------- | ----------------------------------------- |
+| `admin` | `admin@demo.gym.local` | `admin123` | Payload CMS admin panel + custom frontend |
+| `staff` | `staff@demo.gym.local` | `staff123` | Custom frontend only                      |
+
+> The demo database is pre-loaded with 100 sample records. Data may be reset periodically.
 
 ---
 
@@ -69,6 +80,7 @@ flowchart LR
 - **Explicit business rules** — Anti-duplicate payment validation and automatic payment generation are enforced at the collection hook level, not in the UI.
 - **PostgreSQL-only architecture** — SQLite was intentionally removed to ensure full compatibility with serverless environments (Vercel). A local PostgreSQL instance or a free Neon database is required even for development.
 - **Engineering quality practices** — Generated types, integration tests (Vitest), E2E tests (Playwright), and seed scripts for reproducible demo environments.
+- **Role-based access control (RBAC)** — Two roles (`admin`, `staff`) with distinct permissions: admins access both the Payload CMS panel and the custom frontend, while staff are restricted to the frontend. Protected routes enforce this at both the middleware and collection hook level.
 
 ---
 
